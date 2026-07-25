@@ -219,6 +219,7 @@ const FX = {
   bassSlow: 0,
   peakSlow: 0,
   snareSlow: 0,
+  snareFloor: 0,
   hatSlow: 0,
   sparkBudget: 0,
   gridScroll: 0,
@@ -361,7 +362,10 @@ function spawnGridFlock(size, { row, col, hue, strength } = {}) {
   const base = strength ?? 0.3 + Math.random() * 0.15;
 
   for (let k = 0; k < size; k++) {
-    if (gridCells.length >= GRID_CELL_MAX) break;
+    // Dense snare rolls fill the cap — recycle oldest so the grid never goes dark
+    if (gridCells.length >= GRID_CELL_MAX) {
+      gridCells.splice(0, Math.min(10, Math.ceil(size * 0.5)));
+    }
     if (k > 0) {
       // Cohesion: often pull back toward the flock center, else step to a neighbor
       if (Math.random() < 0.4) {
@@ -755,12 +759,12 @@ function drawBassMountain(bass) {
   ctx.restore();
 }
 
-function gridMusicEnergy(bass, mid, air) {
-  return bass * 0.5 + mid * 0.35 + air * 0.15;
+function gridMusicEnergy(bass, mid, air, snare = 0) {
+  return bass * 0.42 + mid * 0.28 + air * 0.12 + snare * 0.38;
 }
 
-function gridMusicHot(bass, mid, air) {
-  return playing && gridMusicEnergy(bass, mid, air) > 0.1;
+function gridMusicHot(bass, mid, air, snare = 0) {
+  return playing && gridMusicEnergy(bass, mid, air, snare) > 0.1;
 }
 
 function prettyName(filename) {
@@ -1558,25 +1562,30 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   FX.prevAir = air;
   FX.prevMid = mid;
 
-  // Slow floors for kick/hat; snare uses a hotter path + flux so cracks aren't missed
+  // Slow floors for kick/hat; snare uses a peak-hold floor so rolls keep cracking
   FX.bassSlow = smooth(FX.bassSlow, bass, 0.03);
   FX.peakSlow = smooth(FX.peakSlow, peak, 0.04);
-  FX.snareSlow = smooth(FX.snareSlow, snare, 0.02);
   FX.hatSlow = smooth(FX.hatSlow, hat, 0.04);
   const bassKick = bass - FX.bassSlow;
   const peakKick = peak - FX.peakSlow;
-  const snareKick = snare - FX.snareSlow;
+  const hatKick = hat - FX.hatSlow;
+  // Peak-hold: rides up with the crack, leaks down so machine-gun snares still onset
+  const prevSnareFloor = FX.snareFloor || 0;
+  FX.snareFloor =
+    snare > prevSnareFloor ? snare : prevSnareFloor * 0.84 + snare * 0.16;
+  const snareKick = Math.max(0, snare - prevSnareFloor * 0.62);
   const snareFlux = snare - (FX.prevSnareHot || snare);
   FX.prevSnareHot = snare;
-  const hatKick = hat - FX.hatSlow;
+  FX.snareSlow = FX.snareFloor; // keep old name warm for any readers
 
   // Drum lanes first — piano FX need the veto before they fire
   const shockHit = bassOnset > 0.035 && bass > 0.16;
   const kickFire =
     shockHit || (bassKick > 0.02 && bass > 0.14) || (peakKick > 0.05 && peak > 0.22);
+  const snareHot = snare > 0.2 && snare >= bass * 0.7;
   const snareFire =
-    (snareKick > 0.012 && snare > 0.08) ||
-    (snareFlux > 0.02 && snare > 0.07) ||
+    (snareKick > 0.01 && snare > 0.07) ||
+    (snareFlux > 0.016 && snare > 0.06) ||
     (midOnset > 0.025 && mid > 0.16 && mid > bass * 0.7);
   const hatFire =
     (hatKick > 0.015 && hat > 0.08) || (airOnset > 0.03 && air > 0.16 && air > bass * 0.75);
@@ -1688,16 +1697,17 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   }
   updateBassMountain(bass, mountainBoost, now);
 
-  const spawnDrum = (kind) => {
+  const spawnDrum = (kind, gapMs) => {
     if (!playing) return;
     const gap =
-      kind === "snare" ? DRUM_GAP_SNARE_MS : kind === "hat" ? DRUM_GAP_HAT_MS : DRUM_GAP_KICK_MS;
+      gapMs ??
+      (kind === "snare" ? DRUM_GAP_SNARE_MS : kind === "hat" ? DRUM_GAP_HAT_MS : DRUM_GAP_KICK_MS);
     const stamp =
       kind === "snare" ? "lastSnareAt" : kind === "hat" ? "lastHatAt" : "lastKickAt";
     if (now - FX[stamp] < gap) return;
     FX[stamp] = now;
     const energy = Math.max(
-      gridMusicEnergy(bass, mid, air),
+      gridMusicEnergy(bass, mid, air, snare),
       peak * 0.85,
       snare * 0.95,
       hat * 0.8,
@@ -1749,6 +1759,9 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
         Math.min(1, snareKick * 6 + snareFlux * 5 + snare * 0.7 + midOnset * 3),
       );
     }
+  } else if (snareHot) {
+    // Machine-gun / roll: keep flocks dripping when onsets flatten out
+    spawnDrum("snare", 55);
   }
   if (hatFire) {
     spawnDrum("hat");
