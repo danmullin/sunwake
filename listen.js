@@ -122,6 +122,7 @@ const FX_TOGGLES = {
   sunHalo: true,
   sunPetals: true,
   sunFlares: true,
+  blackHole: false,
   quasarJets: false,
   doorway: false, // B-sides — rare shutter parting
   skyLighting: true,
@@ -142,6 +143,7 @@ const FX_REQUIRES = {
   constellationTrails: "litFlocks",
   mirrorSea: "litFlocks",
   horizonSway: "cameraSway",
+  quasarJets: "blackHole",
 };
 
 const FX_LABELS = {
@@ -175,6 +177,7 @@ const FX_LABELS = {
   sunHalo: "Sun halo",
   sunPetals: "Sun petals",
   sunFlares: "Sun flares",
+  blackHole: "Black hole",
   quasarJets: "Quasar jets",
   doorway: "Doorway",
   skyLighting: "Sky lighting",
@@ -254,8 +257,6 @@ const FX = {
   flare: 0,
 };
 
-// Flip to false to restore the soft sun.
-const BLACK_HOLE_SUN = false;
 
 /**
  * Live sun size — Effects panel slider (1–1.5). Height drop scales with size.
@@ -2538,7 +2539,7 @@ function drawSunPetals(now, mid, solo) {
  * Length rides solo/lead; width pulses with bass.
  */
 function drawQuasarJets(now, bass, mid, solo) {
-  if (!fxOn("quasarJets")) return;
+  if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
   const lead = Math.max(0, solo * 0.95 + mid * 0.28 - 0.06);
   // Tiny idle stubs so the hole still looks armed when quiet
   const energy = Math.max(0.08, lead);
@@ -2682,7 +2683,7 @@ function drawSoftSun(bass, mid, solo = 0) {
   const m = pulse || halo ? mid : 0;
   const so = pulse || halo ? solo : 0;
 
-  if (BLACK_HOLE_SUN || fxOn("quasarJets")) {
+  if (fxOn("blackHole")) {
     if (halo) {
       const haze = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 3.4);
       haze.addColorStop(0, `rgba(255, 140, 90, ${0.08 + b * 0.12 + so * 0.1})`);
@@ -3730,6 +3731,11 @@ for (const input of document.querySelectorAll("#fx-panel input[data-fx]")) {
     if (key === "mirrorSea" && !input.checked) mirrorCells.length = 0;
     if (key === "gridHeartbeat" && !input.checked) heartbeats.length = 0;
     if (key === "horizonBloom" && !input.checked) bloomRings.length = 0;
+    if (key === "blackHole" && !input.checked) {
+      FX_TOGGLES.quasarJets = false;
+      const jet = document.querySelector('input[data-fx="quasarJets"]');
+      if (jet) jet.checked = false;
+    }
     syncFxDependencies();
   });
 }
