@@ -2546,27 +2546,26 @@ function drawSunPetals(now, mid, solo) {
 
 /**
  * Quasar jets v1 — twin plasma beams along the accretion-disk normal.
- * Quiet until lead/solo energy builds; then length + glow punch out.
+ * Ride mid/solo/bass; always a faint stub when armed so the FX is readable.
  */
 function drawQuasarJets(now, bass, mid, solo) {
   if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
   const lead = Math.max(
     0,
-    solo * 1.1 + mid * 0.35 + Math.max(0, bass - 0.25) * 0.3 - 0.12,
+    solo * 1.25 + mid * 0.55 + Math.max(0, bass - 0.12) * 0.45,
   );
-  FX.jet = smooth(FX.jet, lead, lead > FX.jet ? 0.2 : 0.09);
+  FX.jet = smooth(FX.jet, lead, lead > FX.jet ? 0.22 : 0.1);
   const energy = FX.jet;
-  // Stay dark until there's real lead — no always-on beams
-  if (energy < 0.05) return;
 
   const { x, y } = sunAnchor();
   const scale = Math.min(W, H) * SUN_SCALE;
-  const len = scale * (0.12 + energy * 1.55 + bass * 0.45);
-  const halfW = scale * (0.008 + bass * 0.045 + energy * 0.03);
-  const coreW = Math.max(1.2, scale * (0.0025 + energy * 0.008 + bass * 0.005));
+  // Always-visible stub when armed; grows hard with music
+  const len = scale * (0.22 + energy * 1.85 + bass * 0.55);
+  const halfW = scale * (0.014 + bass * 0.055 + energy * 0.04);
+  const coreW = Math.max(1.6, scale * (0.004 + energy * 0.01 + bass * 0.006));
   // Match black-hole disk tilt (-0.18); jets along the disk normal
   const tilt = -0.18 + Math.PI * 0.5 + Math.sin(now * 0.00035 + mid * 2) * 0.05;
-  const alpha = Math.min(0.85, 0.18 + energy * 0.65 + bass * 0.2);
+  const alpha = Math.min(0.95, 0.28 + energy * 0.7 + bass * 0.25);
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -2577,26 +2576,26 @@ function drawQuasarJets(now, bass, mid, solo) {
     const tip = dir * len;
     // Soft sheath — tapered beam
     const sheath = ctx.createLinearGradient(0, 0, 0, tip);
-    sheath.addColorStop(0, `rgba(255, 230, 200, ${alpha * 0.65})`);
-    sheath.addColorStop(0.1, `rgba(69, 224, 255, ${alpha * 0.85})`);
-    sheath.addColorStop(0.4, `rgba(255, 110, 168, ${alpha * 0.5})`);
-    sheath.addColorStop(0.72, `rgba(130, 70, 200, ${alpha * 0.22})`);
+    sheath.addColorStop(0, `rgba(255, 240, 210, ${alpha * 0.75})`);
+    sheath.addColorStop(0.08, `rgba(69, 224, 255, ${alpha * 0.95})`);
+    sheath.addColorStop(0.35, `rgba(255, 110, 168, ${alpha * 0.6})`);
+    sheath.addColorStop(0.7, `rgba(130, 70, 200, ${alpha * 0.28})`);
     sheath.addColorStop(1, "rgba(69, 224, 255, 0)");
     ctx.fillStyle = sheath;
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(halfW, tip * 0.08);
-    ctx.lineTo(halfW * 0.2, tip);
-    ctx.lineTo(-halfW * 0.2, tip);
+    ctx.lineTo(halfW * 0.22, tip);
+    ctx.lineTo(-halfW * 0.22, tip);
     ctx.lineTo(-halfW, tip * 0.08);
     ctx.closePath();
     ctx.fill();
 
     // Hot core spike
     const core = ctx.createLinearGradient(0, 0, 0, tip);
-    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.15)})`);
-    core.addColorStop(0.18, `rgba(200, 245, 255, ${alpha * 0.85})`);
-    core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.4})`);
+    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.2)})`);
+    core.addColorStop(0.15, `rgba(200, 245, 255, ${alpha * 0.95})`);
+    core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.5})`);
     core.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = core;
     const y0 = Math.min(0, tip);
@@ -3557,7 +3556,8 @@ function frame(now) {
   if (fxOn("bassMountain")) drawBassMountain(bass);
   if (fxOn("mirrorSea")) drawMirrorSea();
   drawSea(now, bass, mid, air);
-  // Flares after sea so the horizon ellipse doesn't bury the streak
+  // Jets + flares after sea so the horizon ellipse doesn't bury them
+  if (fxOn("quasarJets")) drawQuasarJets(now, bass, mid, solo);
   if (fxOn("sunFlares")) drawSunFlares(now, peak, solo, bass);
   if (fxOn("mistSheets")) drawMistSheets(now, mid);
   if (fxOn("rain")) drawRain(mid);
