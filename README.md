@@ -34,9 +34,12 @@ This is the **public** twin of a private visualizer. Never copy private Mist Lis
 
 ```powershell
 node _check-public.js
+node _stamp-version.js   # optional local: date + git SHA into version.json
 ```
 
-Must exit 0 before push. CI blocks Pages deploy if it fails.
+Must exit 0 on the public guard before push. CI stamps `version.json` and blocks Pages deploy if the guard fails.
+
+**Versioning:** hand-edit `codename` in `version.json` when a chapter starts (current: **Quasar**). CI fills `date` + short `sha`. UI shows `Quasar · abc1234` bottom-left; full stamp logs to the console on boot.
 
 ## License
 

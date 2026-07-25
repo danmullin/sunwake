@@ -25,10 +25,12 @@ jobs:
       - name: Guard against Mist Listen chrome leak
         run: node _check-public.js
       - uses: actions/configure-pages@v5
+      - name: Stamp build version
+        run: node _stamp-version.js
       - name: Stage static site
         run: |
           mkdir -p _site
-          cp index.html listen.js listen.css LICENSE README.md _site/
+          cp index.html listen.js listen.css LICENSE README.md version.json _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

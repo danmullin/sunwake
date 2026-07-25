@@ -792,6 +792,32 @@ function setTrackTitle(title) {
   document.title = title ? `Sunwake — ${title}` : "Sunwake";
 }
 
+async function loadBuildStamp() {
+  const el = document.getElementById("build-stamp");
+  try {
+    const res = await fetch(new URL("./version.json", import.meta.url), {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const v = await res.json();
+    const codename = v.codename || "Quasar";
+    const sha = v.sha || "local";
+    const date = v.date || "dev";
+    const name = v.name || "Sunwake";
+    const short = `${codename} · ${sha}`;
+    const full = `${name} “${codename}” — ${date} · ${sha}`;
+    if (el) {
+      el.hidden = false;
+      el.textContent = short;
+      el.title = full;
+    }
+    console.log(`%c${full}`, "color:#45e0ff;font-weight:600");
+  } catch (err) {
+    if (el) el.hidden = true;
+    console.warn("Sunwake build stamp missing", err);
+  }
+}
+
 function ensureGraph() {
   if (!audioCtx) {
     audioCtx = new AudioContext();
@@ -3632,6 +3658,7 @@ function onDrop(e) {
 resize();
 seedWorld();
 setTrackTitle(null);
+loadBuildStamp();
 window.addEventListener("resize", resize);
 playBtn.addEventListener("click", (e) => {
   e.stopPropagation();

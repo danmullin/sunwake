@@ -350,7 +350,8 @@ body {
 }
 
 #stage.ui-hidden .brand,
-#stage.ui-hidden .chrome {
+#stage.ui-hidden .chrome,
+#stage.ui-hidden .build-stamp {
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -647,6 +648,30 @@ body {
 }
 
 .ui-peek[hidden] {
+  display: none;
+}
+
+.build-stamp {
+  position: absolute;
+  top: clamp(1.25rem, 4vh, 2.5rem);
+  right: 0.85rem;
+  z-index: 4;
+  margin: 0;
+  font-family: Orbitron, sans-serif;
+  font-size: 0.48rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: rgba(159, 217, 255, 0.42);
+  pointer-events: none;
+  user-select: none;
+  transition:
+    opacity 0.35s ease,
+    visibility 0.35s ease,
+    color 0.35s ease;
+}
+
+.build-stamp[hidden] {
   display: none;
 }
 
