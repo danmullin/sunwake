@@ -122,6 +122,7 @@ const FX_TOGGLES = {
   sunHalo: true,
   sunPetals: true,
   sunFlares: true,
+  quasarJets: false,
   doorway: false, // B-sides — rare shutter parting
   skyLighting: true,
   starfield: true,
@@ -174,6 +175,7 @@ const FX_LABELS = {
   sunHalo: "Sun halo",
   sunPetals: "Sun petals",
   sunFlares: "Sun flares",
+  quasarJets: "Quasar jets",
   doorway: "Doorway",
   skyLighting: "Sky lighting",
   starfield: "Starfield",
@@ -2532,6 +2534,63 @@ function drawSunPetals(now, mid, solo) {
 }
 
 /**
+ * Quasar jets v1 — twin plasma beams along the accretion-disk normal.
+ * Length rides solo/lead; width pulses with bass.
+ */
+function drawQuasarJets(now, bass, mid, solo) {
+  if (!fxOn("quasarJets")) return;
+  const lead = Math.max(0, solo * 0.95 + mid * 0.28 - 0.06);
+  // Tiny idle stubs so the hole still looks armed when quiet
+  const energy = Math.max(0.08, lead);
+  const { x, y } = sunAnchor();
+  const scale = Math.min(W, H) * SUN_SCALE;
+  const len = scale * (0.28 + lead * 1.15 + bass * 0.35);
+  const halfW = scale * (0.01 + bass * 0.04 + lead * 0.025);
+  const coreW = Math.max(1.1, scale * (0.002 + lead * 0.006 + bass * 0.004));
+  // Match black-hole disk tilt (-0.18); jets along the disk normal
+  const tilt = -0.18 + Math.PI * 0.5 + Math.sin(now * 0.00035 + mid * 2) * 0.05;
+  const alpha = Math.min(0.75, 0.12 + energy * 0.55 + bass * 0.15);
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.translate(x, y);
+  ctx.rotate(tilt);
+
+  for (const dir of [-1, 1]) {
+    const tip = dir * len;
+    // Soft sheath — tapered beam
+    const sheath = ctx.createLinearGradient(0, 0, 0, tip);
+    sheath.addColorStop(0, `rgba(255, 230, 200, ${alpha * 0.55})`);
+    sheath.addColorStop(0.12, `rgba(69, 224, 255, ${alpha * 0.7})`);
+    sheath.addColorStop(0.45, `rgba(255, 110, 168, ${alpha * 0.4})`);
+    sheath.addColorStop(0.75, `rgba(130, 70, 200, ${alpha * 0.18})`);
+    sheath.addColorStop(1, "rgba(69, 224, 255, 0)");
+    ctx.fillStyle = sheath;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(halfW, tip * 0.1);
+    ctx.lineTo(halfW * 0.22, tip);
+    ctx.lineTo(-halfW * 0.22, tip);
+    ctx.lineTo(-halfW, tip * 0.1);
+    ctx.closePath();
+    ctx.fill();
+
+    // Hot core spike
+    const core = ctx.createLinearGradient(0, 0, 0, tip);
+    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.1)})`);
+    core.addColorStop(0.2, `rgba(200, 245, 255, ${alpha * 0.75})`);
+    core.addColorStop(0.55, `rgba(255, 150, 190, ${alpha * 0.35})`);
+    core.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = core;
+    const y0 = Math.min(0, tip);
+    const y1 = Math.max(0, tip);
+    ctx.fillRect(-coreW * 0.5, y0, coreW, y1 - y0);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Anamorphic sun lens flares — streaks stay axis-aligned (no bank/tilt),
  * while the flare center still rides with the sun under the world transform.
  */
@@ -2623,7 +2682,7 @@ function drawSoftSun(bass, mid, solo = 0) {
   const m = pulse || halo ? mid : 0;
   const so = pulse || halo ? solo : 0;
 
-  if (BLACK_HOLE_SUN) {
+  if (BLACK_HOLE_SUN || fxOn("quasarJets")) {
     if (halo) {
       const haze = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 3.4);
       haze.addColorStop(0, `rgba(255, 140, 90, ${0.08 + b * 0.12 + so * 0.1})`);
