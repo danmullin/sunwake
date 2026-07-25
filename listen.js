@@ -31,7 +31,8 @@ let objectUrl = null;
 let displayStream = null;
 /** @type {"idle" | "file" | "system"} */
 let sourceMode = "idle";
-let currentTrack = { url: null, title: "Sunwake" };
+let currentTrack = { url: null, title: null };
+const IDLE_SUBTITLE = "pick a song or share system audio";
 let playing = false;
 let started = false;
 let raf = 0;
@@ -780,8 +781,9 @@ function prettyName(filename) {
 }
 
 function setTrackTitle(title) {
-  if (trackTitleEl) trackTitleEl.textContent = title;
-  document.title = title && title !== "Sunwake" ? `Sunwake — ${title}` : "Sunwake";
+  const label = title || IDLE_SUBTITLE;
+  if (trackTitleEl) trackTitleEl.textContent = label;
+  document.title = title ? `Sunwake — ${title}` : "Sunwake";
 }
 
 function ensureGraph() {
