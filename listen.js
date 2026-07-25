@@ -32,7 +32,6 @@ let displayStream = null;
 /** @type {"idle" | "file" | "system"} */
 let sourceMode = "idle";
 let currentTrack = { url: null, title: null };
-const IDLE_SUBTITLE = "pick a song or share system audio";
 let playing = false;
 let started = false;
 let raf = 0;
@@ -1018,7 +1017,7 @@ function stopSystemListen() {
   systemChromeBtn.hidden = false;
   pickBtn.hidden = false;
   if (chromePresets) chromePresets.hidden = true;
-  setTrackTitle(currentTrack.title || "Sunwake");
+  setTrackTitle(currentTrack.title || null);
   statusEl.textContent = "share ended";
 }
 
@@ -3625,7 +3624,7 @@ function onDrop(e) {
 
 resize();
 seedWorld();
-setTrackTitle("Sunwake");
+setTrackTitle(null);
 window.addEventListener("resize", resize);
 playBtn.addEventListener("click", (e) => {
   e.stopPropagation();
