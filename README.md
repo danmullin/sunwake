@@ -2,7 +2,7 @@
 
 Synthwave audio visualizer — a night-drive sea of light that reacts to your music.
 
-**Live:** *(GitHub Pages optional — coming soon)*
+**Live:** https://danmullin.github.io/sunwake/
 
 ## Run
 
