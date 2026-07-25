@@ -292,7 +292,7 @@ body {
   left: 0;
   right: 0;
   bottom: clamp(1rem, 3vh, 1.75rem);
-  z-index: 2;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
