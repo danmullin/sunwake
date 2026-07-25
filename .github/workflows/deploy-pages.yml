@@ -22,6 +22,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - name: Guard against Mist Listen chrome leak
+        run: node _check-public.js
       - uses: actions/configure-pages@v5
       - name: Stage static site
         run: |

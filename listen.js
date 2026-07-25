@@ -255,6 +255,7 @@ const FX = {
   melodyNextAt: 0,
   doorway: 0, // 0 closed → 1 fully parted shutters
   flare: 0,
+  jet: 0,
 };
 
 
@@ -1204,6 +1205,7 @@ function seedWorld() {
   FX.lastDoorwayAt = 0;
   FX.mist = 0;
   FX.flare = 0;
+  FX.jet = 0;
 
   for (let i = 0; i < 5; i++) {
     ribbons.push({
@@ -2536,21 +2538,27 @@ function drawSunPetals(now, mid, solo) {
 
 /**
  * Quasar jets v1 — twin plasma beams along the accretion-disk normal.
- * Length rides solo/lead; width pulses with bass.
+ * Quiet until lead/solo energy builds; then length + glow punch out.
  */
 function drawQuasarJets(now, bass, mid, solo) {
   if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
-  const lead = Math.max(0, solo * 0.95 + mid * 0.28 - 0.06);
-  // Tiny idle stubs so the hole still looks armed when quiet
-  const energy = Math.max(0.08, lead);
+  const lead = Math.max(
+    0,
+    solo * 1.1 + mid * 0.35 + Math.max(0, bass - 0.25) * 0.3 - 0.12,
+  );
+  FX.jet = smooth(FX.jet, lead, lead > FX.jet ? 0.2 : 0.09);
+  const energy = FX.jet;
+  // Stay dark until there's real lead — no always-on beams
+  if (energy < 0.05) return;
+
   const { x, y } = sunAnchor();
   const scale = Math.min(W, H) * SUN_SCALE;
-  const len = scale * (0.28 + lead * 1.15 + bass * 0.35);
-  const halfW = scale * (0.01 + bass * 0.04 + lead * 0.025);
-  const coreW = Math.max(1.1, scale * (0.002 + lead * 0.006 + bass * 0.004));
+  const len = scale * (0.12 + energy * 1.55 + bass * 0.45);
+  const halfW = scale * (0.008 + bass * 0.045 + energy * 0.03);
+  const coreW = Math.max(1.2, scale * (0.0025 + energy * 0.008 + bass * 0.005));
   // Match black-hole disk tilt (-0.18); jets along the disk normal
   const tilt = -0.18 + Math.PI * 0.5 + Math.sin(now * 0.00035 + mid * 2) * 0.05;
-  const alpha = Math.min(0.75, 0.12 + energy * 0.55 + bass * 0.15);
+  const alpha = Math.min(0.85, 0.18 + energy * 0.65 + bass * 0.2);
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -2561,26 +2569,26 @@ function drawQuasarJets(now, bass, mid, solo) {
     const tip = dir * len;
     // Soft sheath — tapered beam
     const sheath = ctx.createLinearGradient(0, 0, 0, tip);
-    sheath.addColorStop(0, `rgba(255, 230, 200, ${alpha * 0.55})`);
-    sheath.addColorStop(0.12, `rgba(69, 224, 255, ${alpha * 0.7})`);
-    sheath.addColorStop(0.45, `rgba(255, 110, 168, ${alpha * 0.4})`);
-    sheath.addColorStop(0.75, `rgba(130, 70, 200, ${alpha * 0.18})`);
+    sheath.addColorStop(0, `rgba(255, 230, 200, ${alpha * 0.65})`);
+    sheath.addColorStop(0.1, `rgba(69, 224, 255, ${alpha * 0.85})`);
+    sheath.addColorStop(0.4, `rgba(255, 110, 168, ${alpha * 0.5})`);
+    sheath.addColorStop(0.72, `rgba(130, 70, 200, ${alpha * 0.22})`);
     sheath.addColorStop(1, "rgba(69, 224, 255, 0)");
     ctx.fillStyle = sheath;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(halfW, tip * 0.1);
-    ctx.lineTo(halfW * 0.22, tip);
-    ctx.lineTo(-halfW * 0.22, tip);
-    ctx.lineTo(-halfW, tip * 0.1);
+    ctx.lineTo(halfW, tip * 0.08);
+    ctx.lineTo(halfW * 0.2, tip);
+    ctx.lineTo(-halfW * 0.2, tip);
+    ctx.lineTo(-halfW, tip * 0.08);
     ctx.closePath();
     ctx.fill();
 
     // Hot core spike
     const core = ctx.createLinearGradient(0, 0, 0, tip);
-    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.1)})`);
-    core.addColorStop(0.2, `rgba(200, 245, 255, ${alpha * 0.75})`);
-    core.addColorStop(0.55, `rgba(255, 150, 190, ${alpha * 0.35})`);
+    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.15)})`);
+    core.addColorStop(0.18, `rgba(200, 245, 255, ${alpha * 0.85})`);
+    core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.4})`);
     core.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = core;
     const y0 = Math.min(0, tip);
