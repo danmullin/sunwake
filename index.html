@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sunwake</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Orbitron:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="listen.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <canvas id="viz" aria-hidden="true"></canvas>
+
+      <header class="brand">
+        <p class="eyebrow">audio visualizer</p>
+        <h1>SUNWAKE</h1>
+        <p id="track-title" class="subtitle">pick a song or share system audio</p>
+      </header>
+
+      <div id="gate" class="gate" role="button" tabindex="0">
+        <div class="gate-card">
+          <p class="gate-kicker">press play</p>
+          <p class="gate-line">Soft light on a midnight sea</p>
+          <button id="play" type="button" class="play-btn">Open a song</button>
+          <button id="system-play" type="button" class="play-btn system-btn">Listen to system audio</button>
+          <p class="system-hint">Chrome/Edge · Entire screen · Share system audio</p>
+          <label class="pick-label" for="file-pick">or drop any song here</label>
+          <input id="file-pick" type="file" accept="audio/*,.mp3,.wav,.flac,.m4a,.ogg" hidden />
+        </div>
+      </div>
+
+      <footer class="chrome">
+        <div class="meter" aria-hidden="true">
+          <span id="bass-dot" class="dot bass"></span>
+          <span id="mid-dot" class="dot mid"></span>
+          <span id="air-dot" class="dot air"></span>
+        </div>
+        <p id="status" class="status">waiting…</p>
+        <div class="presets chrome-presets" id="chrome-presets" hidden></div>
+        <button id="toggle" type="button" class="toggle" hidden>Pause</button>
+        <button id="restart" type="button" class="toggle" hidden>Restart</button>
+        <button id="system-chrome" type="button" class="toggle" hidden>System audio</button>
+        <label class="toggle pick-chrome" for="file-pick" id="pick-btn" hidden>New song</label>
+        <button id="hide-ui" type="button" class="toggle hide-ui-btn" title="Hide UI (H)">Hide UI</button>
+      </footer>
+
+      <button
+        id="ui-peek"
+        type="button"
+        class="ui-peek"
+        hidden
+        title="Show UI (H)"
+        aria-label="Show UI"
+      >
+        H
+      </button>
+
+      <button
+        id="fx-peek"
+        type="button"
+        class="fx-peek"
+        hidden
+        title="Show effects (F)"
+        aria-label="Show effects panel"
+      >
+        FX
+      </button>
+
+      <aside id="fx-panel" class="fx-panel" aria-label="Visual effects">
+        <header class="fx-panel-head" id="fx-panel-drag">
+          <span class="fx-panel-title">Effects</span>
+          <div class="fx-panel-actions">
+            <button type="button" id="fx-panel-collapse" class="fx-panel-icon" title="Collapse list">
+              −
+            </button>
+            <button type="button" id="fx-panel-hide" class="fx-panel-icon" title="Hide panel (F)">
+              ×
+            </button>
+          </div>
+        </header>
+        <div class="fx-panel-body">
+          <p class="fx-panel-group">Grid</p>
+          <label class="fx-toggle"><input type="checkbox" data-fx="litFlocks" checked /> Lit flocks</label>
+          <label class="fx-toggle" data-requires="litFlocks"
+            ><input type="checkbox" data-fx="constellationTrails" checked /> Constellation trails</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="vanishingMeteors" checked /> Vanishing meteors</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="whipVerticals" checked /> Whip verticals</label
+          >
+          <label class="fx-toggle"><input type="checkbox" data-fx="gridWaves" checked /> Grid waves</label>
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="melodyLines" checked /> Melody lines</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="horizonBloom" checked /> Horizon bloom</label
+          >
+          <p class="fx-panel-group">Pulse</p>
+          <label class="fx-toggle"><input type="checkbox" data-fx="shockRings" checked /> Shock rings</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="sparks" checked /> Sparks</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="streaks" checked /> Streaks</label>
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="keySparks" checked /> Key sparks</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="chordHalos" checked /> Chord Halos</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="hammerRipples" checked /> Hammer ripples</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="harmonyConstellation" checked /> Harmony constellation</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="shootingStars" checked /> Shooting stars</label
+          >
+          <p class="fx-panel-group">Atmosphere</p>
+          <label class="fx-toggle"><input type="checkbox" data-fx="starfield" checked /> Starfield</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="cameraSway" checked /> Camera sway</label>
+          <label class="fx-toggle" data-requires="cameraSway"
+            ><input type="checkbox" data-fx="horizonSway" checked /> Horizon sway</label
+          >
+          <label class="fx-toggle"><input type="checkbox" data-fx="soloAurora" checked /> Solo aurora</label>
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="horizonRibbons" checked /> Horizon ribbons</label
+          >
+          <label class="fx-toggle"><input type="checkbox" data-fx="mistSheets" checked /> Haze sheets</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="rain" checked /> Rain</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="fog" checked /> Fog</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="dew" checked /> Dew</label>
+          <p class="fx-panel-group">Sun</p>
+          <label class="fx-toggle"><input type="checkbox" data-fx="sunPulse" checked /> Sun pulse</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="sunHalo" checked /> Sun halo</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="sunPetals" checked /> Sun petals</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="sunFlares" checked /> Sun flares</label>
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="skyLighting" checked /> Sky lighting</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="horizonEllipse" checked /> Horizon ellipse</label
+          >
+          <label class="fx-slider" for="fx-sun-scale">
+            <span class="fx-slider-label">Sun scale <span id="fx-sun-scale-val">1.30</span></span>
+            <input
+              id="fx-sun-scale"
+              type="range"
+              min="1"
+              max="1.5"
+              step="0.01"
+              value="1.3"
+              data-fx-slider="sunScale"
+            />
+          </label>
+          <p class="fx-panel-group">B-sides</p>
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="bassMountain" /> Bass mountain</label
+          >
+          <label class="fx-toggle" data-requires="litFlocks"
+            ><input type="checkbox" data-fx="mirrorSea" /> Mirror sea</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="gridHeartbeat" /> Grid heartbeat</label
+          >
+          <label class="fx-toggle"
+            ><input type="checkbox" data-fx="melodyThread" /> Melody thread</label
+          >
+          <label class="fx-toggle"><input type="checkbox" data-fx="doorway" /> Doorway</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="depthFog" /> Depth fog</label>
+          <label class="fx-toggle"><input type="checkbox" data-fx="cloudDeck" /> Cloud deck</label>
+        </div>
+      </aside>
+    </div>
+
+    <script src="listen.js" type="module"></script>
+  </body>
+</html>
