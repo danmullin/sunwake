@@ -3637,18 +3637,6 @@ systemChromeBtn.addEventListener("click", (e) => {
   e.stopPropagation();
   startSystemListen(e);
 });
-gate.addEventListener("click", (e) => {
-  if (
-    e.target.closest("label") ||
-    e.target.closest("input") ||
-    e.target.closest("#system-play") ||
-    e.target.closest("#play")
-  ) {
-    return;
-  }
-  filePick?.click();
-});
-gate.addEventListener("keydown", onKey);
 toggleBtn.addEventListener("click", toggle);
 restartBtn.addEventListener("click", restart);
 hideUiBtn?.addEventListener("click", (e) => {

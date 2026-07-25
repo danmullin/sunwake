@@ -124,7 +124,6 @@ body {
   background:
     radial-gradient(ellipse at 50% 40%, rgba(69, 224, 255, 0.12), transparent 55%),
     rgba(5, 8, 20, 0.42);
-  cursor: pointer;
   transition: opacity 0.7s ease, visibility 0.7s ease;
 }
 
