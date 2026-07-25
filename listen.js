@@ -780,8 +780,15 @@ function prettyName(filename) {
 }
 
 function setTrackTitle(title) {
-  const label = title || IDLE_SUBTITLE;
-  if (trackTitleEl) trackTitleEl.textContent = label;
+  if (trackTitleEl) {
+    if (title) {
+      trackTitleEl.hidden = false;
+      trackTitleEl.textContent = title;
+    } else {
+      trackTitleEl.textContent = "";
+      trackTitleEl.hidden = true;
+    }
+  }
   document.title = title ? `Sunwake — ${title}` : "Sunwake";
 }
 
