@@ -2602,23 +2602,25 @@ function drawQuasarJets(now, bass, mid, solo) {
 
   const steps = 14;
   for (const dir of [-1, 1]) {
-    // Slight asymmetry so the two poles don't mirror like CAD
+    // Slight width/phase asymmetry so poles don't look stamped
     const phase = dir > 0 ? 0.35 : 1.1;
-    const lean = Math.sin(t * 0.7 + phase) * scale * 0.012;
+    const widthBias = dir > 0 ? 1.0 : 0.92;
 
     const spine = [];
     for (let i = 0; i <= steps; i++) {
       const u = i / steps;
       const along = poleR + len * u;
-      // Soft lateral drift — stronger toward the tip
-      const sway =
-        Math.sin(t * 1.4 + phase + u * 2.4) * baseW * (0.55 + u * 1.6) +
-        lean * u * u;
+      // Straight polar axis — softness lives in width + glow, not bend
       spine.push({
-        x: sway,
+        x: 0,
         y: dir * along,
         // Width blooms then tapers — plume, not a ruler triangle
-        w: baseW * (0.55 + Math.sin(u * Math.PI) * 0.85 + u * 0.25) * (1.05 - u * 0.35),
+        w:
+          baseW *
+          widthBias *
+          (0.55 + Math.sin(u * Math.PI) * 0.85 + u * 0.25) *
+          (1.05 - u * 0.35) *
+          (1 + Math.sin(t * 1.6 + phase + u * 1.2) * 0.06),
       });
     }
 
