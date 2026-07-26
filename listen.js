@@ -3692,9 +3692,9 @@ function frame(now) {
   applyWorldTransform();
 
   drawSky(now, bass, mid);
-  drawStars(now, air, mid, solo);
-  if (fxOn("harmonyConstellation")) drawHarmonyConstellation();
-  if (fxOn("shootingStars")) drawShootingStars();
+  drawStars(now, air, mid, solo, bass);
+  if (fxOn("harmonyConstellation")) drawHarmonyConstellation(bass, solo);
+  if (fxOn("shootingStars")) drawShootingStars(bass, solo);
   if (fxOn("soloAurora")) drawSoloAurora(solo, air);
   if (fxOn("cloudDeck")) drawCloudDeck(now);
   if (fxOn("melodyThread")) drawMelodyThread();
