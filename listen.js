@@ -2725,40 +2725,122 @@ function drawSoftSun(bass, mid, solo = 0) {
   const so = pulse || halo ? solo : 0;
 
   if (fxOn("blackHole")) {
-    if (halo) {
-      const haze = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 3.4);
-      haze.addColorStop(0, `rgba(255, 140, 90, ${0.08 + b * 0.12 + so * 0.1})`);
-      haze.addColorStop(0.35, `rgba(255, 80, 140, ${0.1 + m * 0.12})`);
-      haze.addColorStop(0.65, `rgba(69, 224, 255, ${0.06 + b * 0.08})`);
-      haze.addColorStop(1, "rgba(0, 0, 0, 0)");
-      ctx.fillStyle = haze;
-      ctx.beginPath();
-      ctx.arc(x, y, r * 3.4, 0, Math.PI * 2);
-      ctx.fill();
+    // Disk stays alive even if sunPulse/halo are off
+    const bb = Math.max(b, bass * 0.85);
+    const mm = Math.max(m, mid * 0.85);
+    const ss = Math.max(so, solo * 0.85);
+    const tilt = -0.18;
+    const rx = r * 2.15;
+    const ry = r * 0.46;
+    const voidR = r * 0.9;
+    const band = r * (0.26 + bb * 0.1);
 
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      const disk = ctx.createRadialGradient(x, y, r * 0.85, x, y, r * 1.85);
-      disk.addColorStop(0, "rgba(0,0,0,0)");
-      disk.addColorStop(0.45, `rgba(255, 200, 120, ${0.15 + so * 0.2})`);
-      disk.addColorStop(0.7, `rgba(255, 110, 168, ${0.35 + m * 0.25})`);
-      disk.addColorStop(0.88, `rgba(120, 230, 255, ${0.45 + b * 0.2})`);
-      disk.addColorStop(1, "rgba(0,0,0,0)");
-      ctx.fillStyle = disk;
-      ctx.beginPath();
-      ctx.ellipse(x, y, r * 1.85, r * 0.55, -0.18, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
+    // Soft gravitational haze (stronger with sunHalo)
+    const hazeA = halo ? 1 : 0.55;
+    const haze = ctx.createRadialGradient(x, y, r * 0.5, x, y, r * 3.2);
+    haze.addColorStop(0, `rgba(255, 140, 90, ${(0.08 + bb * 0.12 + ss * 0.1) * hazeA})`);
+    haze.addColorStop(0.35, `rgba(255, 80, 140, ${(0.1 + mm * 0.12) * hazeA})`);
+    haze.addColorStop(0.65, `rgba(69, 224, 255, ${(0.06 + bb * 0.08) * hazeA})`);
+    haze.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = haze;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 3.2, 0, Math.PI * 2);
+    ctx.fill();
 
-    const voidGrad = ctx.createRadialGradient(x, y, 0, x, y, r * 0.92);
+    // Local-space gradient (call only after translate to the sun)
+    const diskGrad = (boost) => {
+      // Doppler: hot approaching limb → cooler receding
+      const g = ctx.createLinearGradient(-rx, 0, rx, 0);
+      g.addColorStop(0, `rgba(255, 235, 190, ${(0.4 + ss * 0.35) * boost})`);
+      g.addColorStop(0.35, `rgba(255, 140, 90, ${(0.48 + mm * 0.25) * boost})`);
+      g.addColorStop(0.55, `rgba(255, 90, 140, ${(0.42 + bb * 0.2) * boost})`);
+      g.addColorStop(1, `rgba(90, 180, 255, ${(0.3 + bb * 0.2) * boost})`);
+      return g;
+    };
+
+    // 1) Full accretion ring behind the silhouette
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(tilt);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "butt";
+    ctx.strokeStyle = diskGrad(0.45);
+    ctx.lineWidth = band * 1.9;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = diskGrad(0.85);
+    ctx.lineWidth = band;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 2) Event horizon
+    const voidGrad = ctx.createRadialGradient(x, y, 0, x, y, voidR);
     voidGrad.addColorStop(0, "#000000");
-    voidGrad.addColorStop(0.7, "#010309");
-    voidGrad.addColorStop(1, "rgba(0,0,0,0.92)");
+    voidGrad.addColorStop(0.72, "#010309");
+    voidGrad.addColorStop(1, "rgba(0,0,0,0.96)");
     ctx.fillStyle = voidGrad;
     ctx.beginPath();
-    ctx.arc(x, y, r * 0.92, 0, Math.PI * 2);
+    ctx.arc(x, y, voidR, 0, Math.PI * 2);
     ctx.fill();
+
+    // 3) Photon ring
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(255, 230, 200, ${0.55 + ss * 0.35})`;
+    ctx.lineWidth = Math.max(1.5, r * 0.035);
+    ctx.beginPath();
+    ctx.arc(0, 0, voidR * 1.03, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255, 140, 100, ${0.32 + mm * 0.25})`;
+    ctx.lineWidth = Math.max(2, r * 0.065);
+    ctx.beginPath();
+    ctx.arc(0, 0, voidR * 1.08, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    // 4) Front of disk + lensed far-side wrap over the top (Interstellar / EHT look)
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(tilt);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.lineCap = "butt";
+
+    // Near side (bottom lobe) in front of the void
+    ctx.strokeStyle = diskGrad(1.05);
+    ctx.lineWidth = band * 1.05;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI, false);
+    ctx.stroke();
+
+    // Far side redrawn over the silhouette — wraps across the front/top
+    ctx.strokeStyle = diskGrad(1.2);
+    ctx.lineWidth = band * 1.12;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, Math.PI, 0, true);
+    ctx.stroke();
+
+    // Extra lensed sheet: taller arc so the crown clearly rides over the hole
+    ctx.strokeStyle = diskGrad(0.95);
+    ctx.lineWidth = band * 0.9;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx * 0.78, voidR * 0.98, 0, Math.PI * 0.78, Math.PI * 0.22, true);
+    ctx.stroke();
+
+    // Hot inner lip hugging the photon sphere
+    const lip = ctx.createLinearGradient(-voidR * 1.3, 0, voidR * 1.3, 0);
+    lip.addColorStop(0, `rgba(255, 250, 230, ${0.75 + ss * 0.25})`);
+    lip.addColorStop(0.45, `rgba(255, 170, 110, ${0.55 + mm * 0.25})`);
+    lip.addColorStop(1, `rgba(150, 210, 255, ${0.4 + bb * 0.2})`);
+    ctx.strokeStyle = lip;
+    ctx.lineWidth = Math.max(2, r * 0.1);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, voidR * 1.32, voidR * 0.55, 0, Math.PI * 0.9, Math.PI * 0.1, true);
+    ctx.stroke();
+    ctx.restore();
     return;
   }
 
