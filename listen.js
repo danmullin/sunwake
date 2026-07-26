@@ -2089,17 +2089,8 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       s.ly = s.y;
       s.x += s.vx;
       s.y += s.vy;
-      // Tidal stretch toward the hole — ramps hard near / past the horizon
-      const nx = dx / dist;
-      const ny = dy / dist;
-      s.nx = nx;
-      s.ny = ny;
-      const tide = Math.max(0, 1 - dist / (holeR * 2.15));
-      const inside = dist < holeR ? (holeR - dist) / holeR : 0;
-      s.stretch = tide * tide * (1 + inside * 3.5);
-      s.life -= s.decay * (1 + s.stretch * 1.8);
-      // Survive past the rim so the noodle reads, then vanish deep in
-      if (s.life <= 0 || dist < holeR * 0.22) swapRemove(sparks, i);
+      s.life -= s.decay;
+      if (s.life <= 0 || dist < holeR * 0.92) swapRemove(sparks, i);
       continue;
     }
     s.x += s.vx;
@@ -2224,37 +2215,6 @@ function drawSparks(bass = 0, solo = 0) {
         : s.hue === "rose"
           ? "255, 120, 180"
           : "120, 230, 255";
-    const stretch = s.swirl ? s.stretch || 0 : 0;
-
-    if (s.swirl && stretch > 0.08 && s.nx != null) {
-      // Spaghettify: thin radial noodle reaching into the hole
-      const len = s.r * (2 + stretch * 22);
-      const wid = Math.max(0.35, s.r * (0.7 + a) * (1 - Math.min(0.92, stretch * 0.9)));
-      const ox = x - s.nx * len * 0.2;
-      const oy = y - s.ny * len * 0.2;
-      const ix = x + s.nx * len * 0.9;
-      const iy = y + s.ny * len * 0.9;
-      const grad = ctx.createLinearGradient(ox, oy, ix, iy);
-      grad.addColorStop(0, `rgba(${rgb}, ${a * 0.15})`);
-      grad.addColorStop(0.35, `rgba(${rgb}, ${a * 0.85})`);
-      grad.addColorStop(1, `rgba(${rgb}, 0)`);
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = wid;
-      ctx.beginPath();
-      ctx.moveTo(ox, oy);
-      ctx.lineTo(ix, iy);
-      ctx.stroke();
-      // Hot kernel fading as it noodles
-      const coreA = a * Math.max(0, 1 - stretch * 0.7);
-      if (coreA > 0.05) {
-        ctx.fillStyle = `rgba(${rgb}, ${coreA})`;
-        ctx.beginPath();
-        ctx.arc(x, y, Math.max(0.4, s.r * (0.45 + a) * (1 - stretch * 0.6)), 0, Math.PI * 2);
-        ctx.fill();
-      }
-      continue;
-    }
-
     if (s.swirl && s.lx != null) {
       const lx = s.lx * W;
       const ly = s.ly * H;
