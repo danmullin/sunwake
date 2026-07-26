@@ -268,7 +268,7 @@ const SUN_SCALE_MAX = 1.5;
 const SUN_Y_FRAC = 0.38; // original center (fraction of H)
 /** Extra downward shift as fraction of H, per (SUN_SCALE - 1). */
 const SUN_DROP_PER_EXTRA = 0.07;
-/** Accretion-disk plane tilt (rad). Jets use this + π/2 (polar axis / disk normal). */
+/** Accretion-disk plane tilt (rad). Disk major axis = local X; poles / jets = local ±Y. */
 const BH_DISK_TILT = -0.18;
 
 function sunYFrac() {
@@ -2573,8 +2573,8 @@ function drawSunPetals(now, mid, solo) {
 }
 
 /**
- * Quasar jets — twin beams along the accretion-disk normal (polar axis).
- * Not tangent to the disk: AGN jets launch perpendicular to the disk plane.
+ * Quasar jets — twin beams from the poles, along the accretion-disk normal.
+ * Gap through the hole: each beam starts outside the event horizon, not at center.
  */
 function drawQuasarJets(now, bass, mid, solo) {
   if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
@@ -2586,24 +2586,27 @@ function drawQuasarJets(now, bass, mid, solo) {
   const energy = FX.jet;
 
   const { x, y } = sunAnchor();
+  const pulse = fxOn("sunPulse");
+  const r = sunDiskRadius(bass, solo, pulse);
+  const poleR = r * 0.95; // launch just outside the void
   const scale = Math.min(W, H) * SUN_SCALE;
   // Quiet stub when armed; length grows with lead, not a constant blast
   const len = scale * (0.08 + energy * 1.05 + bass * 0.22);
   const halfW = scale * (0.008 + bass * 0.028 + energy * 0.02);
   const coreW = Math.max(1.2, scale * (0.0025 + energy * 0.006 + bass * 0.003));
-  // Disk plane at BH_DISK_TILT; jets along the normal (+π/2)
-  const tilt = BH_DISK_TILT + Math.PI * 0.5;
+  // Same frame as the disk: major axis = local X, poles = local ±Y
   const alpha = Math.min(0.72, 0.12 + energy * 0.48 + bass * 0.12);
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.translate(x, y);
-  ctx.rotate(tilt);
+  ctx.rotate(BH_DISK_TILT);
 
   for (const dir of [-1, 1]) {
-    const tip = dir * len;
-    // Soft sheath — tapered beam
-    const sheath = ctx.createLinearGradient(0, 0, 0, tip);
+    const y0 = dir * poleR;
+    const y1 = dir * (poleR + len);
+    // Soft sheath — tapered beam, disconnected from the other pole
+    const sheath = ctx.createLinearGradient(0, y0, 0, y1);
     sheath.addColorStop(0, `rgba(255, 240, 210, ${alpha * 0.55})`);
     sheath.addColorStop(0.08, `rgba(69, 224, 255, ${alpha * 0.75})`);
     sheath.addColorStop(0.35, `rgba(255, 110, 168, ${alpha * 0.42})`);
@@ -2611,24 +2614,24 @@ function drawQuasarJets(now, bass, mid, solo) {
     sheath.addColorStop(1, "rgba(69, 224, 255, 0)");
     ctx.fillStyle = sheath;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(halfW, tip * 0.08);
-    ctx.lineTo(halfW * 0.22, tip);
-    ctx.lineTo(-halfW * 0.22, tip);
-    ctx.lineTo(-halfW, tip * 0.08);
+    ctx.moveTo(0, y0);
+    ctx.lineTo(halfW, y0 + dir * len * 0.08);
+    ctx.lineTo(halfW * 0.22, y1);
+    ctx.lineTo(-halfW * 0.22, y1);
+    ctx.lineTo(-halfW, y0 + dir * len * 0.08);
     ctx.closePath();
     ctx.fill();
 
     // Hot core spike
-    const core = ctx.createLinearGradient(0, 0, 0, tip);
+    const core = ctx.createLinearGradient(0, y0, 0, y1);
     core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(0.85, alpha * 1.05)})`);
     core.addColorStop(0.15, `rgba(200, 245, 255, ${alpha * 0.75})`);
     core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.35})`);
     core.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = core;
-    const y0 = Math.min(0, tip);
-    const y1 = Math.max(0, tip);
-    ctx.fillRect(-coreW * 0.5, y0, coreW, y1 - y0);
+    const top = Math.min(y0, y1);
+    const bot = Math.max(y0, y1);
+    ctx.fillRect(-coreW * 0.5, top, coreW, bot - top);
   }
 
   ctx.restore();
