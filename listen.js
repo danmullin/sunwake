@@ -1576,6 +1576,7 @@ function spawnSpark(kind = "ember") {
       y: py / H,
       lx: px / W,
       ly: py / H,
+      trail: [], // recent positions for motion blur
       vx: (tx * tangSpeed) / W,
       vy: (ty * tangSpeed) / H,
       life: 1,
@@ -2089,6 +2090,11 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       s.ly = s.y;
       s.x += s.vx;
       s.y += s.vy;
+      // Motion-blur history — denser samples as they whip in
+      if (!s.trail) s.trail = [];
+      s.trail.push({ x: s.x, y: s.y });
+      const maxTrail = 10 + Math.min(8, Math.floor(Math.hypot(s.vx * W, s.vy * H) * 2.5));
+      while (s.trail.length > maxTrail) s.trail.shift();
       s.life -= s.decay;
       if (s.life <= 0 || dist < holeR * 0.92) swapRemove(sparks, i);
       continue;
@@ -2205,6 +2211,7 @@ function drawSparks(bass = 0, solo = 0) {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.lineCap = "round";
+  ctx.lineJoin = "round";
   for (const s of sparks) {
     const a = Math.max(0, s.life);
     const x = s.x * W;
@@ -2215,7 +2222,27 @@ function drawSparks(bass = 0, solo = 0) {
         : s.hue === "rose"
           ? "255, 120, 180"
           : "120, 230, 255";
-    if (s.swirl && s.lx != null) {
+
+    // Motion blur: fade ribbon along the recent path into the hole
+    if (s.swirl && s.trail && s.trail.length > 1) {
+      const pts = s.trail;
+      const n = pts.length;
+      for (let i = 1; i < n; i++) {
+        const t0 = (i - 1) / (n - 1);
+        const t1 = i / (n - 1);
+        const x0 = pts[i - 1].x * W;
+        const y0 = pts[i - 1].y * H;
+        const x1 = pts[i].x * W;
+        const y1 = pts[i].y * H;
+        const segA = a * (0.12 + t1 * 0.75);
+        ctx.strokeStyle = `rgba(${rgb}, ${segA})`;
+        ctx.lineWidth = Math.max(0.6, s.r * (0.35 + t1 * 0.85));
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      }
+    } else if (s.swirl && s.lx != null) {
       const lx = s.lx * W;
       const ly = s.ly * H;
       ctx.strokeStyle = `rgba(${rgb}, ${a * 0.45})`;
@@ -2225,6 +2252,7 @@ function drawSparks(bass = 0, solo = 0) {
       ctx.lineTo(x, y);
       ctx.stroke();
     }
+
     ctx.fillStyle = `rgba(${rgb}, ${a})`;
     ctx.beginPath();
     ctx.arc(x, y, s.r * (0.6 + a), 0, Math.PI * 2);
