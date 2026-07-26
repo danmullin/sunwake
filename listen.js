@@ -284,6 +284,21 @@ function sunDiskRadius(bass = 0, solo = 0, pulseEnabled = false) {
   return Math.min(W, H) * base * SUN_SCALE;
 }
 
+/** Event-horizon radius used to hide starfield behind the void. */
+function blackHoleOccludeRadius(bass = 0, solo = 0) {
+  if (!fxOn("blackHole")) return 0;
+  return sunDiskRadius(bass, solo, fxOn("sunPulse")) * 0.9;
+}
+
+function behindBlackHole(px, py, bass = 0, solo = 0) {
+  const R = blackHoleOccludeRadius(bass, solo);
+  if (R <= 0) return false;
+  const { x, y } = sunAnchor();
+  const dx = px - x;
+  const dy = py - y;
+  return dx * dx + dy * dy <= R * R;
+}
+
 // Vertical grid whip — also mirrored by FX_TOGGLES.whipVerticals / Effects panel.
 let WHIP_VERTICALS = true;
 const WHIP_SAMPLE_MS = 100;
@@ -2238,7 +2253,7 @@ function drawHammerRipples() {
   ctx.restore();
 }
 
-function drawHarmonyConstellation() {
+function drawHarmonyConstellation(bass = 0, solo = 0) {
   if (!fxOn("harmonyConstellation") || !harmonyLinks.length) return;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -2250,6 +2265,9 @@ function drawHarmonyConstellation() {
     const y0 = link.ay * H;
     const x1 = link.bx * W;
     const y1 = link.by * H;
+    if (behindBlackHole(x0, y0, bass, solo) && behindBlackHole(x1, y1, bass, solo)) {
+      continue;
+    }
     const grad = ctx.createLinearGradient(x0, y0, x1, y1);
     grad.addColorStop(0, synthRainbow(link.hueT, a * 0.25));
     grad.addColorStop(0.5, synthRainbow(link.hueT + 0.12, a * 0.85));
@@ -2261,12 +2279,16 @@ function drawHarmonyConstellation() {
     ctx.lineTo(x1, y1);
     ctx.stroke();
     ctx.fillStyle = synthRainbow(link.hueT + 0.18, a * 0.7);
-    ctx.beginPath();
-    ctx.arc(x0, y0, 1.2 + a, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(x1, y1, 1.2 + a, 0, Math.PI * 2);
-    ctx.fill();
+    if (!behindBlackHole(x0, y0, bass, solo)) {
+      ctx.beginPath();
+      ctx.arc(x0, y0, 1.2 + a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    if (!behindBlackHole(x1, y1, bass, solo)) {
+      ctx.beginPath();
+      ctx.arc(x1, y1, 1.2 + a, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
   ctx.restore();
 }
@@ -2295,7 +2317,7 @@ function drawSky(now, bass, mid) {
   }
 }
 
-function drawStars(now, air, mid, solo) {
+function drawStars(now, air, mid, solo, bass = 0) {
   if (!fxOn("starfield") || !stars.length) return;
   const bloom = 0.2 + air * 1.1 + solo * 0.45 + mid * 0.15;
   ctx.save();
@@ -2306,6 +2328,7 @@ function drawStars(now, air, mid, solo) {
     if (a < 0.08) continue;
     const x = s.x * W;
     const y = s.y * H;
+    if (behindBlackHole(x, y, bass, solo)) continue;
     const r = s.r * (0.7 + air * 0.9 + solo * 0.4);
     ctx.fillStyle = `rgba(220, 240, 255, ${a * 0.9})`;
     if (!s.flare || a <= 0.45 || r < 1.35) {
@@ -2329,7 +2352,7 @@ function drawStars(now, air, mid, solo) {
   ctx.restore();
 }
 
-function drawShootingStars() {
+function drawShootingStars(bass = 0, solo = 0) {
   if (!shooting.length) return;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -2338,10 +2361,12 @@ function drawShootingStars() {
     const a = Math.max(0, s.life);
     const x = s.x * W;
     const y = s.y * H;
+    if (behindBlackHole(x, y, bass, solo)) continue;
     const len = s.len * Math.min(W, H);
     const ang = Math.atan2(s.vy, s.vx);
     const x2 = x - Math.cos(ang) * len;
     const y2 = y - Math.sin(ang) * len;
+    if (behindBlackHole(x2, y2, bass, solo)) continue;
     const grad = ctx.createLinearGradient(x2, y2, x, y);
     if (s.hue === "gold") {
       grad.addColorStop(0, "rgba(240, 197, 106, 0)");
@@ -2817,8 +2842,8 @@ function drawSoftSun(bass, mid, solo = 0) {
     // 2) Event horizon
     const voidGrad = ctx.createRadialGradient(x, y, 0, x, y, voidR);
     voidGrad.addColorStop(0, "#000000");
-    voidGrad.addColorStop(0.72, "#010309");
-    voidGrad.addColorStop(1, "rgba(0,0,0,0.96)");
+    voidGrad.addColorStop(0.72, "#000000");
+    voidGrad.addColorStop(1, "#000000");
     ctx.fillStyle = voidGrad;
     ctx.beginPath();
     ctx.arc(x, y, voidR, 0, Math.PI * 2);
