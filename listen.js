@@ -123,11 +123,11 @@ const FX_TOGGLES = {
   sunHalo: true,
   sunPetals: true,
   sunFlares: true,
-  blackHole: false,
-  quasarJets: false,
-  photonPulse: false,
-  infallSparks: false,
-  lensingShimmer: false,
+  blackHole: false, // void sun + opens Black hole child FX
+  quasarJets: true, // armed by default — one click on Black hole enables full suite
+  photonPulse: true,
+  infallSparks: true,
+  lensingShimmer: true,
   doorway: false, // B-sides — rare shutter parting
   skyLighting: true,
   starfield: true,
