@@ -2078,15 +2078,23 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       const dx = ax - px;
       const dy = ay - py;
       const dist = Math.hypot(dx, dy) || 1;
-      // Whip inward — strong pull, still a spiral
-      const pull = (0.00055 + 0.055 / (dist + 18)) * (1.1 + FX.solo * 0.5);
-      const orbit = (0.00012 + 0.018 / (dist + 24)) * (dist > holeR * 1.15 ? 1.25 : 0.5);
+      // Tidal ramp: mild far out, then sharp acceleration into the horizon (~1/r^3 feel)
+      const rNorm = Math.max(0.15, dist / Math.max(holeR, 1));
+      const gravity = 0.00035 / (rNorm * rNorm);
+      const tidal = 0.0018 / (rNorm * rNorm * rNorm);
+      const pull = (gravity + tidal) * (1.05 + FX.solo * 0.45);
+      // Orbit fades near the rim so the dive reads as a plunge, not a circle
+      const orbit =
+        (0.0001 + 0.014 / (dist + 28)) *
+        (rNorm > 1.35 ? 1.15 : Math.max(0.12, (rNorm - 0.85) * 1.4));
       const tx = -dy / dist;
       const ty = dx / dist;
       s.vx += (dx / W) * pull + (tx / W) * orbit * (s.spin || 1);
       s.vy += (dy / H) * pull + (ty / H) * orbit * (s.spin || 1);
-      s.vx *= 0.985;
-      s.vy *= 0.985;
+      // Less drag as they fall in so tidal speed-up sticks
+      const drag = rNorm > 1.4 ? 0.988 : rNorm > 1.05 ? 0.994 : 0.998;
+      s.vx *= drag;
+      s.vy *= drag;
       s.lx = s.x;
       s.ly = s.y;
       s.x += s.vx;
