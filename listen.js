@@ -1577,6 +1577,7 @@ function spawnSpark(kind = "ember") {
       lx: px / W,
       ly: py / H,
       trail: [], // recent positions for motion blur
+      age: 0,
       vx: (tx * tangSpeed) / W,
       vy: (ty * tangSpeed) / H,
       life: 1,
@@ -2090,11 +2091,14 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       s.ly = s.y;
       s.x += s.vx;
       s.y += s.vy;
-      // Motion-blur history — denser samples as they whip in
+      // Motion-blur history — wait before trails so the dive reads first
+      s.age = (s.age || 0) + 1;
       if (!s.trail) s.trail = [];
-      s.trail.push({ x: s.x, y: s.y });
-      const maxTrail = 10 + Math.min(8, Math.floor(Math.hypot(s.vx * W, s.vy * H) * 2.5));
-      while (s.trail.length > maxTrail) s.trail.shift();
+      if (s.age > 28) {
+        s.trail.push({ x: s.x, y: s.y });
+        const maxTrail = 10 + Math.min(8, Math.floor(Math.hypot(s.vx * W, s.vy * H) * 2.5));
+        while (s.trail.length > maxTrail) s.trail.shift();
+      }
       s.life -= s.decay;
       if (s.life <= 0 || dist < holeR * 0.92) swapRemove(sparks, i);
       continue;
