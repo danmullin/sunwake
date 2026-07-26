@@ -1552,6 +1552,33 @@ function spawnInfall(strength = 0.5) {
 function spawnSpark(kind = "ember") {
   if (!fxOn("sparks")) return;
   if (sparks.length > sparkCap()) return;
+
+  // Black hole: Sparks spiral into the void instead of drifting up
+  if (fxOn("blackHole")) {
+    const strength = kind === "solo" ? 0.9 : kind === "spray" ? 0.6 : 0.45;
+    sparks.push({
+      infall: true,
+      ang: Math.random() * Math.PI * 2,
+      rad: 1.65 + Math.random() * 1.55 + (kind === "spray" ? 0.35 : 0),
+      spin:
+        (Math.random() > 0.5 ? 1 : -1) *
+        (0.04 + Math.random() * 0.1 + strength * 0.035),
+      fall: 0.011 + Math.random() * 0.02 + strength * 0.012,
+      life: 1,
+      decay: 0.005 + Math.random() * 0.01,
+      r: kind === "solo" ? 1.4 + Math.random() * 2.8 : 0.8 + Math.random() * 1.6,
+      hue:
+        kind === "solo"
+          ? Math.random() > 0.45
+            ? "gold"
+            : "rose"
+          : Math.random() > 0.5
+            ? "cyan"
+            : "gold",
+    });
+    return;
+  }
+
   const cx = 0.5 + (Math.random() - 0.5) * 0.55;
   const fromHorizon = kind === "spray";
   sparks.push({
@@ -2025,6 +2052,14 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
 
   for (let i = sparks.length - 1; i >= 0; i--) {
     const s = sparks[i];
+    if (s.infall) {
+      s.ang += s.spin;
+      s.rad -= s.fall;
+      s.spin *= 1.012;
+      s.life -= s.decay;
+      if (s.life <= 0 || s.rad <= 1.02) swapRemove(sparks, i);
+      continue;
+    }
     s.x += s.vx;
     s.y += s.vy;
     s.vy -= 0.00004;
@@ -2132,21 +2167,44 @@ function drawSoloAurora(solo, air) {
   ctx.restore();
 }
 
-function drawSparks() {
+function drawSparks(bass = 0, solo = 0) {
   if (!sparks.length) return;
+  const hole = fxOn("blackHole");
+  const { x: ax, y: ay } = sunAnchor();
+  const R = hole
+    ? blackHoleOccludeRadius(bass, solo) ||
+      sunDiskRadius(bass, solo, fxOn("sunPulse")) * 0.9
+    : 0;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   for (const s of sparks) {
-    const x = s.x * W;
-    const y = s.y * H;
     const a = Math.max(0, s.life);
-    const col =
+    let x;
+    let y;
+    if (s.infall && R > 0) {
+      x = ax + Math.cos(s.ang) * s.rad * R;
+      y = ay + Math.sin(s.ang) * s.rad * R;
+    } else {
+      x = s.x * W;
+      y = s.y * H;
+    }
+    const rgb =
       s.hue === "gold"
-        ? `rgba(255, 210, 120, ${a})`
+        ? "255, 210, 120"
         : s.hue === "rose"
-          ? `rgba(255, 120, 180, ${a})`
-          : `rgba(120, 230, 255, ${a})`;
-    ctx.fillStyle = col;
+          ? "255, 120, 180"
+          : "120, 230, 255";
+    if (s.infall && R > 0) {
+      const tx = -Math.sin(s.ang) * s.spin * R * 8;
+      const ty = Math.cos(s.ang) * s.spin * R * 8;
+      ctx.strokeStyle = `rgba(${rgb}, ${a * 0.35})`;
+      ctx.lineWidth = Math.max(0.6, s.r * 0.45);
+      ctx.beginPath();
+      ctx.moveTo(x - tx, y - ty);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = `rgba(${rgb}, ${a})`;
     ctx.beginPath();
     ctx.arc(x, y, s.r * (0.6 + a), 0, Math.PI * 2);
     ctx.fill();
@@ -3850,7 +3908,7 @@ function frame(now) {
   if (fxOn("rain")) drawRain(mid);
   if (fxOn("fog")) drawFog(now, bass);
   if (fxOn("dew")) drawDew(now, air, mid);
-  if (fxOn("sparks")) drawSparks();
+  if (fxOn("sparks")) drawSparks(bass, solo);
   if (fxOn("streaks")) drawStreaks();
 
   resetScreenTransform();
