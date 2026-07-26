@@ -268,6 +268,8 @@ const SUN_SCALE_MAX = 1.5;
 const SUN_Y_FRAC = 0.38; // original center (fraction of H)
 /** Extra downward shift as fraction of H, per (SUN_SCALE - 1). */
 const SUN_DROP_PER_EXTRA = 0.07;
+/** Accretion-disk plane tilt (rad). Jets use this + π/2 (polar axis / disk normal). */
+const BH_DISK_TILT = -0.18;
 
 function sunYFrac() {
   return SUN_Y_FRAC + (SUN_SCALE - 1) * SUN_DROP_PER_EXTRA;
@@ -2571,27 +2573,27 @@ function drawSunPetals(now, mid, solo) {
 }
 
 /**
- * Quasar jets v1 — twin plasma beams along the accretion-disk normal.
- * Ride mid/solo/bass; always a faint stub when armed so the FX is readable.
+ * Quasar jets — twin beams along the accretion-disk normal (polar axis).
+ * Not tangent to the disk: AGN jets launch perpendicular to the disk plane.
  */
 function drawQuasarJets(now, bass, mid, solo) {
   if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
   const lead = Math.max(
     0,
-    solo * 1.25 + mid * 0.55 + Math.max(0, bass - 0.12) * 0.45,
+    solo * 0.85 + mid * 0.28 + Math.max(0, bass - 0.22) * 0.25 - 0.04,
   );
-  FX.jet = smooth(FX.jet, lead, lead > FX.jet ? 0.22 : 0.1);
+  FX.jet = smooth(FX.jet, lead, lead > FX.jet ? 0.18 : 0.08);
   const energy = FX.jet;
 
   const { x, y } = sunAnchor();
   const scale = Math.min(W, H) * SUN_SCALE;
-  // Always-visible stub when armed; grows hard with music
-  const len = scale * (0.22 + energy * 1.85 + bass * 0.55);
-  const halfW = scale * (0.014 + bass * 0.055 + energy * 0.04);
-  const coreW = Math.max(1.6, scale * (0.004 + energy * 0.01 + bass * 0.006));
-  // Match black-hole disk tilt (-0.18); jets along the disk normal
-  const tilt = -0.18 + Math.PI * 0.5 + Math.sin(now * 0.00035 + mid * 2) * 0.05;
-  const alpha = Math.min(0.95, 0.28 + energy * 0.7 + bass * 0.25);
+  // Quiet stub when armed; length grows with lead, not a constant blast
+  const len = scale * (0.08 + energy * 1.05 + bass * 0.22);
+  const halfW = scale * (0.008 + bass * 0.028 + energy * 0.02);
+  const coreW = Math.max(1.2, scale * (0.0025 + energy * 0.006 + bass * 0.003));
+  // Disk plane at BH_DISK_TILT; jets along the normal (+π/2)
+  const tilt = BH_DISK_TILT + Math.PI * 0.5;
+  const alpha = Math.min(0.72, 0.12 + energy * 0.48 + bass * 0.12);
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
@@ -2602,10 +2604,10 @@ function drawQuasarJets(now, bass, mid, solo) {
     const tip = dir * len;
     // Soft sheath — tapered beam
     const sheath = ctx.createLinearGradient(0, 0, 0, tip);
-    sheath.addColorStop(0, `rgba(255, 240, 210, ${alpha * 0.75})`);
-    sheath.addColorStop(0.08, `rgba(69, 224, 255, ${alpha * 0.95})`);
-    sheath.addColorStop(0.35, `rgba(255, 110, 168, ${alpha * 0.6})`);
-    sheath.addColorStop(0.7, `rgba(130, 70, 200, ${alpha * 0.28})`);
+    sheath.addColorStop(0, `rgba(255, 240, 210, ${alpha * 0.55})`);
+    sheath.addColorStop(0.08, `rgba(69, 224, 255, ${alpha * 0.75})`);
+    sheath.addColorStop(0.35, `rgba(255, 110, 168, ${alpha * 0.42})`);
+    sheath.addColorStop(0.7, `rgba(130, 70, 200, ${alpha * 0.18})`);
     sheath.addColorStop(1, "rgba(69, 224, 255, 0)");
     ctx.fillStyle = sheath;
     ctx.beginPath();
@@ -2619,9 +2621,9 @@ function drawQuasarJets(now, bass, mid, solo) {
 
     // Hot core spike
     const core = ctx.createLinearGradient(0, 0, 0, tip);
-    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(1, alpha * 1.2)})`);
-    core.addColorStop(0.15, `rgba(200, 245, 255, ${alpha * 0.95})`);
-    core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.5})`);
+    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(0.85, alpha * 1.05)})`);
+    core.addColorStop(0.15, `rgba(200, 245, 255, ${alpha * 0.75})`);
+    core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.35})`);
     core.addColorStop(1, "rgba(255, 255, 255, 0)");
     ctx.fillStyle = core;
     const y0 = Math.min(0, tip);
@@ -2729,11 +2731,11 @@ function drawSoftSun(bass, mid, solo = 0) {
     const bb = Math.max(b, bass * 0.85);
     const mm = Math.max(m, mid * 0.85);
     const ss = Math.max(so, solo * 0.85);
-    const tilt = -0.18;
-    const rx = r * 2.15;
-    const ry = r * 0.46;
+    const tilt = BH_DISK_TILT;
+    const rx = r * 1.72;
+    const ry = r * 0.34;
     const voidR = r * 0.9;
-    const band = r * (0.26 + bb * 0.1);
+    const band = r * (0.16 + bb * 0.06);
 
     // Soft gravitational haze (stronger with sunHalo)
     const hazeA = halo ? 1 : 0.55;
@@ -2764,8 +2766,8 @@ function drawSoftSun(bass, mid, solo = 0) {
     ctx.rotate(tilt);
     ctx.globalCompositeOperation = "lighter";
     ctx.lineCap = "butt";
-    ctx.strokeStyle = diskGrad(0.45);
-    ctx.lineWidth = band * 1.9;
+    ctx.strokeStyle = diskGrad(0.35);
+    ctx.lineWidth = band * 1.45;
     ctx.beginPath();
     ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
     ctx.stroke();
