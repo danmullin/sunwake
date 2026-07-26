@@ -89,6 +89,7 @@ const meteors = [];
 const mirrorCells = [];
 const heartbeats = [];
 const bloomRings = [];
+const infalls = [];
 
 /** Runtime FX switches — mirrored by the glass Effects panel.
  * Main groups default on; B-sides (parked experiments) default off. */
@@ -124,6 +125,9 @@ const FX_TOGGLES = {
   sunFlares: true,
   blackHole: false,
   quasarJets: false,
+  photonPulse: false,
+  infallSparks: false,
+  lensingShimmer: false,
   doorway: false, // B-sides — rare shutter parting
   skyLighting: true,
   starfield: true,
@@ -144,6 +148,9 @@ const FX_REQUIRES = {
   mirrorSea: "litFlocks",
   horizonSway: "cameraSway",
   quasarJets: "blackHole",
+  photonPulse: "blackHole",
+  infallSparks: "blackHole",
+  lensingShimmer: "blackHole",
 };
 
 const FX_LABELS = {
@@ -179,6 +186,9 @@ const FX_LABELS = {
   sunFlares: "Sun flares",
   blackHole: "Black hole",
   quasarJets: "Quasar jets",
+  photonPulse: "Photon pulse",
+  infallSparks: "Infall sparks",
+  lensingShimmer: "Lensing shimmer",
   doorway: "Doorway",
   skyLighting: "Sky lighting",
   starfield: "Starfield",
@@ -256,6 +266,7 @@ const FX = {
   doorway: 0, // 0 closed → 1 fully parted shutters
   flare: 0,
   jet: 0,
+  photon: 0,
 };
 
 
@@ -1242,6 +1253,7 @@ function seedWorld() {
   mirrorCells.length = 0;
   heartbeats.length = 0;
   bloomRings.length = 0;
+  infalls.length = 0;
   bassMountain.fill(0);
   FX.solo = 0;
   FX.keys = 0;
@@ -1257,6 +1269,7 @@ function seedWorld() {
   FX.mist = 0;
   FX.flare = 0;
   FX.jet = 0;
+  FX.photon = 0;
 
   for (let i = 0; i < 5; i++) {
     ribbons.push({
@@ -1514,6 +1527,28 @@ function updateMelodyThread(now, leadPitch, mid, solo) {
   while (melodyThread.length > MELODY_MAX) melodyThread.shift();
 }
 
+const INFALL_MAX = 90;
+
+function spawnInfall(strength = 0.5) {
+  if (!fxOn("infallSparks") || !fxOn("blackHole")) return;
+  if (infalls.length >= INFALL_MAX) return;
+  const n = Math.min(5, 1 + Math.floor(strength * 4));
+  for (let i = 0; i < n; i++) {
+    if (infalls.length >= INFALL_MAX) break;
+    infalls.push({
+      ang: Math.random() * Math.PI * 2,
+      // Multiples of event-horizon radius — spiral in from the disc zone
+      rad: 1.55 + Math.random() * 1.35,
+      spin: (Math.random() > 0.5 ? 1 : -1) * (0.035 + Math.random() * 0.09 + strength * 0.04),
+      fall: 0.01 + Math.random() * 0.018 + strength * 0.012,
+      life: 1,
+      decay: 0.004 + Math.random() * 0.008,
+      r: 0.9 + Math.random() * 1.8 + strength * 0.8,
+      hue: Math.random() > 0.55 ? "gold" : Math.random() > 0.45 ? "rose" : "cyan",
+    });
+  }
+}
+
 function spawnSpark(kind = "ember") {
   if (!fxOn("sparks")) return;
   if (sparks.length > sparkCap()) return;
@@ -1610,6 +1645,13 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   const soloTarget = Math.pow(Math.min(1, lead * 1.35), 1.4);
   FX.solo = smooth(FX.solo, soloTarget, 0.12);
   FX.mist = smooth(FX.mist, 0.12 + mid * 0.75 + air * 0.2, 0.1);
+
+  if (fxOn("blackHole") && fxOn("photonPulse")) {
+    const hit = Math.max(0, peak * 1.15 + Math.max(0, bass - 0.12) * 0.85 - 0.05);
+    FX.photon = smooth(FX.photon, hit, hit > FX.photon ? 0.32 : 0.1);
+  } else {
+    FX.photon = smooth(FX.photon, 0, 0.14);
+  }
 
   const bassOnset = bass - FX.prevBass;
   const airOnset = air - FX.prevAir;
@@ -1821,6 +1863,9 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   }
   if (hatFire) {
     spawnDrum("hat");
+    if (fxOn("infallSparks") && fxOn("blackHole")) {
+      spawnInfall(0.35 + hat * 0.65);
+    }
     // Hats answer flocks with meteors racing *away* from the sun down the verticals
     if (playing && fxOn("vanishingMeteors")) {
       const burst = 1 + (hat > 0.2 ? 1 : 0) + (Math.random() > 0.55 ? 1 : 0);
@@ -1884,6 +1929,7 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   if (airOnset > 0.05 && air > 0.22) {
     for (let i = 0; i < 2 + Math.floor(air * 6); i++) spawnSpark("ember");
     if (airOnset > 0.07 && Math.random() < 0.55 + air * 0.35) spawnShootingStar();
+    if (fxOn("infallSparks") && fxOn("blackHole")) spawnInfall(0.25 + air * 0.5);
   }
 
   // Launch a new slow crest every WHIP_SAMPLE_MS (they travel independently).
@@ -1984,6 +2030,15 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
     s.vy -= 0.00004;
     s.life -= s.decay;
     if (s.life <= 0 || s.y < -0.05) swapRemove(sparks, i);
+  }
+
+  for (let i = infalls.length - 1; i >= 0; i--) {
+    const p = infalls[i];
+    p.ang += p.spin;
+    p.rad -= p.fall;
+    p.spin *= 1.012;
+    p.life -= p.decay;
+    if (p.life <= 0 || p.rad <= 1.02) swapRemove(infalls, i);
   }
 
   for (let i = streaks.length - 1; i >= 0; i--) {
@@ -2094,6 +2149,38 @@ function drawSparks() {
     ctx.fillStyle = col;
     ctx.beginPath();
     ctx.arc(x, y, s.r * (0.6 + a), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawInfallSparks(bass = 0, solo = 0) {
+  if (!fxOn("infallSparks") || !fxOn("blackHole") || !infalls.length) return;
+  const { x, y } = sunAnchor();
+  const R = blackHoleOccludeRadius(bass, solo) || sunDiskRadius(bass, solo, fxOn("sunPulse")) * 0.9;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of infalls) {
+    const a = Math.max(0, p.life);
+    const px = x + Math.cos(p.ang) * p.rad * R;
+    const py = y + Math.sin(p.ang) * p.rad * R;
+    const rgb =
+      p.hue === "gold"
+        ? "255, 210, 120"
+        : p.hue === "rose"
+          ? "255, 130, 170"
+          : "120, 230, 255";
+    const tx = -Math.sin(p.ang) * p.spin * R * 8;
+    const ty = Math.cos(p.ang) * p.spin * R * 8;
+    ctx.strokeStyle = `rgba(${rgb}, ${a * 0.35})`;
+    ctx.lineWidth = Math.max(0.6, p.r * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(px - tx, py - ty);
+    ctx.lineTo(px, py);
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${rgb}, ${a})`;
+    ctx.beginPath();
+    ctx.arc(px, py, p.r * (0.55 + a * 0.55), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -2320,18 +2407,55 @@ function drawSky(now, bass, mid) {
 function drawStars(now, air, mid, solo, bass = 0) {
   if (!fxOn("starfield") || !stars.length) return;
   const bloom = 0.2 + air * 1.1 + solo * 0.45 + mid * 0.15;
+  const lens = fxOn("lensingShimmer") && fxOn("blackHole");
+  const anchor = lens ? sunAnchor() : null;
+  const holeR = lens ? blackHoleOccludeRadius(bass, solo) : 0;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   for (const s of stars) {
     const tw = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(now * 0.0018 * s.sp + s.tw));
     const a = Math.min(1, s.bright * bloom * tw);
     if (a < 0.08) continue;
-    const x = s.x * W;
-    const y = s.y * H;
+    let x = s.x * W;
+    let y = s.y * H;
     if (behindBlackHole(x, y, bass, solo)) continue;
     const r = s.r * (0.7 + air * 0.9 + solo * 0.4);
+
+    let streak = 0;
+    if (lens && holeR > 0) {
+      const dx = x - anchor.x;
+      const dy = y - anchor.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const outer = holeR * 2.35;
+      if (d > holeR && d < outer) {
+        const u = 1 - (d - holeR) / (outer - holeR); // 1 at rim
+        const bend = u * u * holeR * 0.28;
+        const tx = -dy / d;
+        const ty = dx / d;
+        const wobble = Math.sin(now * 0.0022 + s.tw * 3);
+        x += tx * bend * wobble;
+        y += ty * bend * wobble;
+        streak = u * (3.5 + r * 2.5);
+      }
+    }
+
     ctx.fillStyle = `rgba(220, 240, 255, ${a * 0.9})`;
-    if (!s.flare || a <= 0.45 || r < 1.35) {
+    if (streak > 1.2) {
+      const dx = x - anchor.x;
+      const dy = y - anchor.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const tx = (-dy / d) * streak;
+      const ty = (dx / d) * streak;
+      ctx.strokeStyle = `rgba(220, 240, 255, ${a * 0.55})`;
+      ctx.lineWidth = Math.max(0.7, r * 0.7);
+      ctx.beginPath();
+      ctx.moveTo(x - tx, y - ty);
+      ctx.lineTo(x + tx, y + ty);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(0.8, r * 0.7), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (!s.flare || a <= 0.45 || r < 1.35) {
       const s2 = Math.max(1, r * 1.6);
       ctx.fillRect(x - s2 * 0.5, y - s2 * 0.5, s2, s2);
     } else {
@@ -2849,20 +2973,29 @@ function drawSoftSun(bass, mid, solo = 0) {
     ctx.arc(x, y, voidR, 0, Math.PI * 2);
     ctx.fill();
 
-    // 3) Photon ring
+    // 3) Photon ring (quieter base; Photon pulse breathes with kick/peak)
+    const pulse = fxOn("photonPulse") ? FX.photon : 0;
     ctx.save();
     ctx.translate(x, y);
     ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = `rgba(255, 230, 200, ${0.55 + ss * 0.35})`;
-    ctx.lineWidth = Math.max(1.5, r * 0.035);
+    const ringGlow = 0.4 + ss * 0.25 + pulse * 0.55;
+    ctx.strokeStyle = `rgba(255, 230, 200, ${Math.min(0.95, ringGlow)})`;
+    ctx.lineWidth = Math.max(1.5, r * (0.035 + pulse * 0.05));
     ctx.beginPath();
-    ctx.arc(0, 0, voidR * 1.03, 0, Math.PI * 2);
+    ctx.arc(0, 0, voidR * (1.03 + pulse * 0.02), 0, Math.PI * 2);
     ctx.stroke();
-    ctx.strokeStyle = `rgba(255, 140, 100, ${0.32 + mm * 0.25})`;
-    ctx.lineWidth = Math.max(2, r * 0.065);
+    ctx.strokeStyle = `rgba(255, 140, 100, ${0.28 + mm * 0.2 + pulse * 0.4})`;
+    ctx.lineWidth = Math.max(2, r * (0.06 + pulse * 0.08));
     ctx.beginPath();
-    ctx.arc(0, 0, voidR * 1.08, 0, Math.PI * 2);
+    ctx.arc(0, 0, voidR * (1.08 + pulse * 0.025), 0, Math.PI * 2);
     ctx.stroke();
+    if (pulse > 0.35) {
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(pulse - 0.35) * 0.9})`;
+      ctx.lineWidth = Math.max(1, r * 0.02);
+      ctx.beginPath();
+      ctx.arc(0, 0, voidR * 1.01, 0, Math.PI * 2);
+      ctx.stroke();
+    }
     ctx.restore();
 
     // 4) Front of disk — near side + far side wrapping over the silhouette
@@ -3891,9 +4024,12 @@ for (const input of document.querySelectorAll("#fx-panel input[data-fx]")) {
     if (key === "gridHeartbeat" && !input.checked) heartbeats.length = 0;
     if (key === "horizonBloom" && !input.checked) bloomRings.length = 0;
     if (key === "blackHole" && !input.checked) {
-      FX_TOGGLES.quasarJets = false;
-      const jet = document.querySelector('input[data-fx="quasarJets"]');
-      if (jet) jet.checked = false;
+      for (const child of ["quasarJets", "photonPulse", "infallSparks", "lensingShimmer"]) {
+        FX_TOGGLES[child] = false;
+        const el = document.querySelector(`input[data-fx="${child}"]`);
+        if (el) el.checked = false;
+      }
+      infalls.length = 0;
     }
     syncFxDependencies();
   });
