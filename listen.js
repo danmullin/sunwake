@@ -2574,7 +2574,7 @@ function drawSunPetals(now, mid, solo) {
 
 /**
  * Quasar jets — twin beams from the poles, along the accretion-disk normal.
- * Soft plumes (not hard cones): gentle sway, feathered width, gap through the hole.
+ * Soft plumes on a straight polar axis: feathered width, tip bloom, gap through the hole.
  */
 function drawQuasarJets(now, bass, mid, solo) {
   if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
@@ -2675,7 +2675,7 @@ function drawQuasarJets(now, bass, mid, solo) {
  * while the flare center still rides with the sun under the world transform.
  */
 function drawSunFlares(now, peak, solo, bass) {
-  if (!fxOn("sunFlares")) return;
+  if (!fxOn("sunFlares") || fxOn("blackHole")) return;
   const hit = Math.max(
     0,
     peak * 1.15 + solo * 0.9 + Math.max(0, bass - 0.4) * 0.4 - 0.2,
