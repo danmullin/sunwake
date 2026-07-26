@@ -1553,20 +1553,34 @@ function spawnSpark(kind = "ember") {
   if (!fxOn("sparks")) return;
   if (sparks.length > sparkCap()) return;
 
-  // Black hole: Sparks spiral into the void instead of drifting up
+  // Black hole: birth outside the disc, then gravity + orbit pulls them in
   if (fxOn("blackHole")) {
     const strength = kind === "solo" ? 0.9 : kind === "spray" ? 0.6 : 0.45;
+    const { x: ax, y: ay } = sunAnchor();
+    const holeR =
+      sunDiskRadius(0, 0, false) * 0.9 || Math.min(W, H) * 0.1;
+    const ang = Math.random() * Math.PI * 2;
+    // Start well outside the silhouette — readable spiral, not a tight ring
+    const dist = holeR * (2.4 + Math.random() * 2.2 + strength * 0.4);
+    const px = ax + Math.cos(ang) * dist;
+    const py = ay + Math.sin(ang) * dist;
+    // Mostly tangential kick so they curve in instead of diving straight
+    const tangSpeed = 1.4 + Math.random() * 2.2 + strength * 1.2;
+    const spin = Math.random() > 0.5 ? 1 : -1;
+    const tx = -Math.sin(ang) * spin;
+    const ty = Math.cos(ang) * spin;
     sparks.push({
-      infall: true,
-      ang: Math.random() * Math.PI * 2,
-      rad: 1.65 + Math.random() * 1.55 + (kind === "spray" ? 0.35 : 0),
-      spin:
-        (Math.random() > 0.5 ? 1 : -1) *
-        (0.04 + Math.random() * 0.1 + strength * 0.035),
-      fall: 0.011 + Math.random() * 0.02 + strength * 0.012,
+      swirl: true,
+      spin,
+      x: px / W,
+      y: py / H,
+      lx: px / W,
+      ly: py / H,
+      vx: (tx * tangSpeed) / W,
+      vy: (ty * tangSpeed) / H,
       life: 1,
-      decay: 0.005 + Math.random() * 0.01,
-      r: kind === "solo" ? 1.4 + Math.random() * 2.8 : 0.8 + Math.random() * 1.6,
+      decay: 0.004 + Math.random() * 0.007,
+      r: kind === "solo" ? 1.5 + Math.random() * 2.6 : 0.9 + Math.random() * 1.7,
       hue:
         kind === "solo"
           ? Math.random() > 0.45
@@ -2052,12 +2066,31 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
 
   for (let i = sparks.length - 1; i >= 0; i--) {
     const s = sparks[i];
-    if (s.infall) {
-      s.ang += s.spin;
-      s.rad -= s.fall;
-      s.spin *= 1.012;
+    if (s.swirl) {
+      const { x: ax, y: ay } = sunAnchor();
+      const holeR =
+        blackHoleOccludeRadius(levels.bass, FX.solo) ||
+        sunDiskRadius(levels.bass, FX.solo, fxOn("sunPulse")) * 0.9;
+      const px = s.x * W;
+      const py = s.y * H;
+      const dx = ax - px;
+      const dy = ay - py;
+      const dist = Math.hypot(dx, dy) || 1;
+      // Stronger pull as they near the horizon; keep a tangential swirl
+      const pull = (0.00012 + 0.014 / (dist + 30)) * (0.85 + FX.solo * 0.4);
+      const orbit = (0.00004 + 0.006 / (dist + 40)) * (dist > holeR * 1.2 ? 1 : 0.35);
+      const tx = -dy / dist;
+      const ty = dx / dist;
+      s.vx += (dx / W) * pull + (tx / W) * orbit * (s.spin || 1);
+      s.vy += (dy / H) * pull + (ty / H) * orbit * (s.spin || 1);
+      s.vx *= 0.992;
+      s.vy *= 0.992;
+      s.lx = s.x;
+      s.ly = s.y;
+      s.x += s.vx;
+      s.y += s.vy;
       s.life -= s.decay;
-      if (s.life <= 0 || s.rad <= 1.02) swapRemove(sparks, i);
+      if (s.life <= 0 || dist < holeR * 0.92) swapRemove(sparks, i);
       continue;
     }
     s.x += s.vx;
@@ -2169,38 +2202,26 @@ function drawSoloAurora(solo, air) {
 
 function drawSparks(bass = 0, solo = 0) {
   if (!sparks.length) return;
-  const hole = fxOn("blackHole");
-  const { x: ax, y: ay } = sunAnchor();
-  const R = hole
-    ? blackHoleOccludeRadius(bass, solo) ||
-      sunDiskRadius(bass, solo, fxOn("sunPulse")) * 0.9
-    : 0;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
   for (const s of sparks) {
     const a = Math.max(0, s.life);
-    let x;
-    let y;
-    if (s.infall && R > 0) {
-      x = ax + Math.cos(s.ang) * s.rad * R;
-      y = ay + Math.sin(s.ang) * s.rad * R;
-    } else {
-      x = s.x * W;
-      y = s.y * H;
-    }
+    const x = s.x * W;
+    const y = s.y * H;
     const rgb =
       s.hue === "gold"
         ? "255, 210, 120"
         : s.hue === "rose"
           ? "255, 120, 180"
           : "120, 230, 255";
-    if (s.infall && R > 0) {
-      const tx = -Math.sin(s.ang) * s.spin * R * 8;
-      const ty = Math.cos(s.ang) * s.spin * R * 8;
-      ctx.strokeStyle = `rgba(${rgb}, ${a * 0.35})`;
-      ctx.lineWidth = Math.max(0.6, s.r * 0.45);
+    if (s.swirl && s.lx != null) {
+      const lx = s.lx * W;
+      const ly = s.ly * H;
+      ctx.strokeStyle = `rgba(${rgb}, ${a * 0.45})`;
+      ctx.lineWidth = Math.max(0.8, s.r * 0.55);
       ctx.beginPath();
-      ctx.moveTo(x - tx, y - ty);
+      ctx.moveTo(lx, ly);
       ctx.lineTo(x, y);
       ctx.stroke();
     }
