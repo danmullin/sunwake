@@ -1560,12 +1560,12 @@ function spawnSpark(kind = "ember") {
     const holeR =
       sunDiskRadius(0, 0, false) * 0.9 || Math.min(W, H) * 0.1;
     const ang = Math.random() * Math.PI * 2;
-    // Start well outside the silhouette — readable spiral, not a tight ring
-    const dist = holeR * (2.4 + Math.random() * 2.2 + strength * 0.4);
+    // Start outside the silhouette — close enough that the dive reads quickly
+    const dist = holeR * (1.85 + Math.random() * 1.15 + strength * 0.25);
     const px = ax + Math.cos(ang) * dist;
     const py = ay + Math.sin(ang) * dist;
-    // Mostly tangential kick so they curve in instead of diving straight
-    const tangSpeed = 1.4 + Math.random() * 2.2 + strength * 1.2;
+    // Strong tangential kick so they whip in instead of drifting
+    const tangSpeed = 3.2 + Math.random() * 3.5 + strength * 2.2;
     const spin = Math.random() > 0.5 ? 1 : -1;
     const tx = -Math.sin(ang) * spin;
     const ty = Math.cos(ang) * spin;
@@ -1579,7 +1579,7 @@ function spawnSpark(kind = "ember") {
       vx: (tx * tangSpeed) / W,
       vy: (ty * tangSpeed) / H,
       life: 1,
-      decay: 0.004 + Math.random() * 0.007,
+      decay: 0.008 + Math.random() * 0.012,
       r: kind === "solo" ? 1.5 + Math.random() * 2.6 : 0.9 + Math.random() * 1.7,
       hue:
         kind === "solo"
@@ -2076,15 +2076,15 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       const dx = ax - px;
       const dy = ay - py;
       const dist = Math.hypot(dx, dy) || 1;
-      // Stronger pull as they near the horizon; keep a tangential swirl
-      const pull = (0.00012 + 0.014 / (dist + 30)) * (0.85 + FX.solo * 0.4);
-      const orbit = (0.00004 + 0.006 / (dist + 40)) * (dist > holeR * 1.2 ? 1 : 0.35);
+      // Whip inward — strong pull, still a spiral
+      const pull = (0.00055 + 0.055 / (dist + 18)) * (1.1 + FX.solo * 0.5);
+      const orbit = (0.00012 + 0.018 / (dist + 24)) * (dist > holeR * 1.15 ? 1.25 : 0.5);
       const tx = -dy / dist;
       const ty = dx / dist;
       s.vx += (dx / W) * pull + (tx / W) * orbit * (s.spin || 1);
       s.vy += (dy / H) * pull + (ty / H) * orbit * (s.spin || 1);
-      s.vx *= 0.992;
-      s.vy *= 0.992;
+      s.vx *= 0.985;
+      s.vy *= 0.985;
       s.lx = s.x;
       s.ly = s.y;
       s.x += s.vx;
