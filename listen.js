@@ -2574,7 +2574,7 @@ function drawSunPetals(now, mid, solo) {
 
 /**
  * Quasar jets — twin beams from the poles, along the accretion-disk normal.
- * Gap through the hole: each beam starts outside the event horizon, not at center.
+ * Soft plumes (not hard cones): gentle sway, feathered width, gap through the hole.
  */
 function drawQuasarJets(now, bass, mid, solo) {
   if (!fxOn("quasarJets") || !fxOn("blackHole")) return;
@@ -2588,50 +2588,81 @@ function drawQuasarJets(now, bass, mid, solo) {
   const { x, y } = sunAnchor();
   const pulse = fxOn("sunPulse");
   const r = sunDiskRadius(bass, solo, pulse);
-  const poleR = r * 0.95; // launch just outside the void
+  const poleR = r * 0.95;
   const scale = Math.min(W, H) * SUN_SCALE;
-  // Quiet stub when armed; length grows with lead, not a constant blast
   const len = scale * (0.08 + energy * 1.05 + bass * 0.22);
-  const halfW = scale * (0.008 + bass * 0.028 + energy * 0.02);
-  const coreW = Math.max(1.2, scale * (0.0025 + energy * 0.006 + bass * 0.003));
-  // Same frame as the disk: major axis = local X, poles = local ±Y
+  const baseW = scale * (0.01 + bass * 0.03 + energy * 0.022);
   const alpha = Math.min(0.72, 0.12 + energy * 0.48 + bass * 0.12);
+  const t = now * 0.0011;
 
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.translate(x, y);
   ctx.rotate(BH_DISK_TILT);
 
+  const steps = 14;
   for (const dir of [-1, 1]) {
-    const y0 = dir * poleR;
-    const y1 = dir * (poleR + len);
-    // Soft sheath — tapered beam, disconnected from the other pole
-    const sheath = ctx.createLinearGradient(0, y0, 0, y1);
-    sheath.addColorStop(0, `rgba(255, 240, 210, ${alpha * 0.55})`);
-    sheath.addColorStop(0.08, `rgba(69, 224, 255, ${alpha * 0.75})`);
-    sheath.addColorStop(0.35, `rgba(255, 110, 168, ${alpha * 0.42})`);
-    sheath.addColorStop(0.7, `rgba(130, 70, 200, ${alpha * 0.18})`);
-    sheath.addColorStop(1, "rgba(69, 224, 255, 0)");
-    ctx.fillStyle = sheath;
-    ctx.beginPath();
-    ctx.moveTo(0, y0);
-    ctx.lineTo(halfW, y0 + dir * len * 0.08);
-    ctx.lineTo(halfW * 0.22, y1);
-    ctx.lineTo(-halfW * 0.22, y1);
-    ctx.lineTo(-halfW, y0 + dir * len * 0.08);
-    ctx.closePath();
-    ctx.fill();
+    // Slight asymmetry so the two poles don't mirror like CAD
+    const phase = dir > 0 ? 0.35 : 1.1;
+    const lean = Math.sin(t * 0.7 + phase) * scale * 0.012;
 
-    // Hot core spike
-    const core = ctx.createLinearGradient(0, y0, 0, y1);
-    core.addColorStop(0, `rgba(255, 255, 255, ${Math.min(0.85, alpha * 1.05)})`);
-    core.addColorStop(0.15, `rgba(200, 245, 255, ${alpha * 0.75})`);
-    core.addColorStop(0.5, `rgba(255, 150, 190, ${alpha * 0.35})`);
-    core.addColorStop(1, "rgba(255, 255, 255, 0)");
-    ctx.fillStyle = core;
-    const top = Math.min(y0, y1);
-    const bot = Math.max(y0, y1);
-    ctx.fillRect(-coreW * 0.5, top, coreW, bot - top);
+    const spine = [];
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps;
+      const along = poleR + len * u;
+      // Soft lateral drift — stronger toward the tip
+      const sway =
+        Math.sin(t * 1.4 + phase + u * 2.4) * baseW * (0.55 + u * 1.6) +
+        lean * u * u;
+      spine.push({
+        x: sway,
+        y: dir * along,
+        // Width blooms then tapers — plume, not a ruler triangle
+        w: baseW * (0.55 + Math.sin(u * Math.PI) * 0.85 + u * 0.25) * (1.05 - u * 0.35),
+      });
+    }
+
+    // Feathered passes: wide soft sheath → mid glow → thin core
+    const passes = [
+      { widen: 2.4, a: alpha * 0.22, c0: [69, 224, 255], c1: [130, 70, 200] },
+      { widen: 1.35, a: alpha * 0.45, c0: [255, 110, 168], c1: [69, 224, 255] },
+      { widen: 0.55, a: alpha * 0.7, c0: [255, 245, 230], c1: [200, 245, 255] },
+    ];
+
+    for (const pass of passes) {
+      ctx.beginPath();
+      for (let i = 0; i < spine.length; i++) {
+        const p = spine[i];
+        const px = p.x + p.w * pass.widen;
+        if (i === 0) ctx.moveTo(px, p.y);
+        else ctx.lineTo(px, p.y);
+      }
+      for (let i = spine.length - 1; i >= 0; i--) {
+        const p = spine[i];
+        ctx.lineTo(p.x - p.w * pass.widen, p.y);
+      }
+      ctx.closePath();
+      const yA = spine[0].y;
+      const yB = spine[spine.length - 1].y;
+      const g = ctx.createLinearGradient(0, yA, 0, yB);
+      g.addColorStop(0, `rgba(${pass.c0[0]}, ${pass.c0[1]}, ${pass.c0[2]}, ${pass.a})`);
+      g.addColorStop(0.45, `rgba(${pass.c1[0]}, ${pass.c1[1]}, ${pass.c1[2]}, ${pass.a * 0.65})`);
+      g.addColorStop(1, `rgba(${pass.c1[0]}, ${pass.c1[1]}, ${pass.c1[2]}, 0)`);
+      ctx.fillStyle = g;
+      ctx.fill();
+    }
+
+    // Soft tip bloom
+    const tip = spine[spine.length - 1];
+    const tipR = baseW * (1.2 + energy * 0.8);
+    const tipG = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, tipR);
+    tipG.addColorStop(0, `rgba(255, 240, 220, ${alpha * 0.35})`);
+    tipG.addColorStop(0.5, `rgba(69, 224, 255, ${alpha * 0.18})`);
+    tipG.addColorStop(1, "rgba(69, 224, 255, 0)");
+    ctx.fillStyle = tipG;
+    ctx.beginPath();
+    ctx.arc(tip.x, tip.y, tipR, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
