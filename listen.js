@@ -2802,43 +2802,26 @@ function drawSoftSun(bass, mid, solo = 0) {
     ctx.stroke();
     ctx.restore();
 
-    // 4) Front of disk + lensed far-side wrap over the top (Interstellar / EHT look)
+    // 4) Front of disk — near side + far side wrapping over the silhouette
+    // (same ellipse only; no extra crescent arcs)
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(tilt);
     ctx.globalCompositeOperation = "lighter";
     ctx.lineCap = "butt";
 
-    // Near side (bottom lobe) in front of the void
-    ctx.strokeStyle = diskGrad(1.05);
-    ctx.lineWidth = band * 1.05;
+    // Near side (bottom) in front of the void
+    ctx.strokeStyle = diskGrad(1.0);
+    ctx.lineWidth = band;
     ctx.beginPath();
     ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI, false);
     ctx.stroke();
 
-    // Far side redrawn over the silhouette — wraps across the front/top
-    ctx.strokeStyle = diskGrad(1.2);
-    ctx.lineWidth = band * 1.12;
+    // Far side over the top — same ring geometry, slightly softer so it reads continuous
+    ctx.strokeStyle = diskGrad(0.9);
+    ctx.lineWidth = band * 0.95;
     ctx.beginPath();
     ctx.ellipse(0, 0, rx, ry, 0, Math.PI, 0, true);
-    ctx.stroke();
-
-    // Extra lensed sheet: taller arc so the crown clearly rides over the hole
-    ctx.strokeStyle = diskGrad(0.95);
-    ctx.lineWidth = band * 0.9;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, rx * 0.78, voidR * 0.98, 0, Math.PI * 0.78, Math.PI * 0.22, true);
-    ctx.stroke();
-
-    // Hot inner lip hugging the photon sphere
-    const lip = ctx.createLinearGradient(-voidR * 1.3, 0, voidR * 1.3, 0);
-    lip.addColorStop(0, `rgba(255, 250, 230, ${0.75 + ss * 0.25})`);
-    lip.addColorStop(0.45, `rgba(255, 170, 110, ${0.55 + mm * 0.25})`);
-    lip.addColorStop(1, `rgba(150, 210, 255, ${0.4 + bb * 0.2})`);
-    ctx.strokeStyle = lip;
-    ctx.lineWidth = Math.max(2, r * 0.1);
-    ctx.beginPath();
-    ctx.ellipse(0, 0, voidR * 1.32, voidR * 0.55, 0, Math.PI * 0.9, Math.PI * 0.1, true);
     ctx.stroke();
     ctx.restore();
     return;
