@@ -4024,11 +4024,7 @@ for (const input of document.querySelectorAll("#fx-panel input[data-fx]")) {
     if (key === "gridHeartbeat" && !input.checked) heartbeats.length = 0;
     if (key === "horizonBloom" && !input.checked) bloomRings.length = 0;
     if (key === "blackHole" && !input.checked) {
-      for (const child of ["quasarJets", "photonPulse", "infallSparks", "lensingShimmer"]) {
-        FX_TOGGLES[child] = false;
-        const el = document.querySelector(`input[data-fx="${child}"]`);
-        if (el) el.checked = false;
-      }
+      // Leave child toggles armed so turning Black hole back on is one click
       infalls.length = 0;
     }
     syncFxDependencies();
