@@ -65,7 +65,7 @@ React is out of scope for v1 (and likely longer). A fullscreen visualizer does n
 | Phase | Ship |
 |---|---|
 | **0 — Spike** | Capacitor Android + Spotify App Remote connect + now-playing + cover art — **complete** (2026-07-29) in `projects/sunwake-mobile/` |
-| **1 — Visual** | Port Sunwake renderer; drive FX from analysis beats; touch UI |
+| **1 — Visual** | Port Sunwake renderer; drive FX from analysis beats; touch UI — **started** (renderer + synth energy feed on device; Web API audio-analysis next) |
 | **2 — Product** | Full FX panel, Supporter IAP → Black Hole suite, tip SKUs, restore |
 | **3 — Polish** | Battery/thermal, background reconnect, store listing, then iOS |
 
@@ -79,6 +79,13 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 - Now-playing: title / artist / play-pause / skip
 - Album art via ImagesApi → data URL (MEDIUM), shimmer on track change
 - Web mock still available via `npm start`
+
+### Phase 1 status (2026-07-29)
+
+- Copied `listen.js` / `listen.css` into `projects/sunwake-mobile/src/`
+- Spotify chrome overlays the fullscreen viz (Connect / now-playing / transport)
+- Energy via `window.__SUNWAKE_FEED__` — position-synced synthetic kicks/snares/hats per track (no PCM)
+- Next: Spotify Web API audio-analysis (PKCE) replacing the synth feed
 
 ## Success criteria
 
