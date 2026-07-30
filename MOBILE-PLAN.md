@@ -4,7 +4,7 @@ Restored 2026-07-28 after the in-chat plan card was deleted.
 
 ## Product shape
 
-- **What it is:** Sunwake’s night-drive visualizer on the phone, listening to / controlling **Spotify**.
+- **What it is:** Sunwake’s night-drive visualizer on the phone, reacting to **real audio** (mic / capture / file), with optional **Spotify** chrome.
 - **What it is not:** Another MilkDrop preset browser, ad-supported equalizer, or paywalled core experience.
 - **Web stays free:** `projects/sunwake` on Pages keeps working as today (local file + system-audio capture). Mobile is the Spotify-native sibling.
 
@@ -22,20 +22,23 @@ Restored 2026-07-28 after the in-chat plan card was deleted.
 - **iOS second** (same Capacitor shell + Spotify iOS App Remote).
 - Skip PWA-as-Spotify-product (no clean App Remote). Optional later “Add to Home Screen” mirror only if useful.
 
-## Spotify architecture
+## Audio architecture (salvage 2026-07-29)
 
-Mobile cannot tap Spotify PCM the way desktop Chrome system-audio does.
+**Goal:** sky reacts to **actual PCM/FFT**, not synth position and not Spotify's deprecated analysis API.
 
-1. **App Remote** — connect to installed Spotify app; play/pause/skip; now-playing metadata + playback position.
-2. **Web API audio-analysis** — beats/sections/segments for the current track; interpolate against App Remote position.
-3. **Fallback (phase 2):** mic / Android audio capture if analysis sync feels thin — not required for v1.
+1. **Mic** — `getUserMedia` → WebAudio `AnalyserNode` (works with speakers; noisy on headphones-only).
+2. **Android AudioPlaybackCapture** — MediaProjection + `AudioRecord` band energies → feed; **silence ~2s → auto mic fallback** (Spotify often opts out of capture).
+3. **Local file** — file pick → `createMediaElementSource` → same analyser path (full-quality viz, no Spotify required).
 
-Expect: Spotify app installed; Premium likely required for reliable remote playback control.
+**Spotify App Remote** stays **optional chrome** (title / art / skip) — never the beat source.
+
+**Dead for new apps:** Web API `/v1/audio-analysis` (403). Do not plan product on it.
+**Out of scope:** Web Playback SDK (no PCM to AnalyserNode).
 
 ```text
-Spotify app --> App Remote (state/position/track)
-Audio Analysis API --> beats/sections/segments
-         \--> Sunwake renderer (FX + sun)
+Mic / Capture / File --> PCM --> AnalyserNode (or native bands)
+                              \--> Sunwake night-drive frame loop
+Spotify App Remote -.optional.-> now-playing chrome only
 ```
 
 ## App UX (v1)
@@ -65,9 +68,19 @@ React is out of scope for v1 (and likely longer). A fullscreen visualizer does n
 | Phase | Ship |
 |---|---|
 | **0 — Spike** | Capacitor Android + Spotify App Remote connect + now-playing + cover art — **complete** (2026-07-29) in `projects/sunwake-mobile/` |
-| **1 — Visual** | Port Sunwake renderer; drive FX from analysis beats; touch UI — **started** (renderer + synth energy feed on device; Web API audio-analysis next) |
+| **1 — Salvage** | Real audio inputs (Mic / Capture / File) drive FFT; App Remote optional chrome — **landed** 2026-07-29; analysis API abandoned |
 | **2 — Product** | Full FX panel, Supporter IAP → Black Hole suite, tip SKUs, restore |
 | **3 — Polish** | Battery/thermal, background reconnect, store listing, then iOS |
+
+### Phase 1 salvage — real audio (2026-07-29)
+
+Honest reset: we mis-steered toward Spotify-native analysis / synth-from-position. Salvage = **direct analysis paths**.
+
+- Source strip: **Mic | Capture | File** (one live at a time)
+- `SunwakeMobile.startAnalyserFromStream` / `FromElement` / `stopAnalyser`
+- Synth `__SUNWAKE_FEED__` only for native capture bands (or idle off) — not primary driver
+- `RECORD_AUDIO` + MediaProjection foreground service for Capture
+- Docs: analysis API marked dead for new apps
 
 ### Phase 0 — complete (2026-07-29)
 
@@ -83,9 +96,9 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 ### Phase 1 status (2026-07-29)
 
 - Copied `listen.js` / `listen.css` into `projects/sunwake-mobile/src/`
-- Spotify chrome overlays the fullscreen viz (Connect / now-playing / transport)
-- Energy via `window.__SUNWAKE_FEED__` — position-synced synthetic kicks/snares/hats per track (no PCM)
-- Next: Spotify Web API audio-analysis (PKCE) replacing the synth feed
+- Spotify chrome overlays the fullscreen viz (Connect / now-playing / transport) — **optional**
+- **Salvage:** Mic / Capture / File drive real FFT; synth-from-position and audio-analysis API abandoned
+- Capture silence (~2s near-zero RMS) auto-falls back to mic with status toast
 
 ## Success criteria
 
