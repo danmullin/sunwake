@@ -27,7 +27,7 @@ Restored 2026-07-28 after the in-chat plan card was deleted.
 **Goal:** sky reacts to **actual PCM/FFT**, not synth position and not Spotify's deprecated analysis API.
 
 1. **Mic** — `getUserMedia` → WebAudio `AnalyserNode` (works with speakers; noisy on headphones-only).
-2. **Android AudioPlaybackCapture** — MediaProjection + `AudioRecord` band energies → feed; **silence ~2s → auto mic fallback** (Spotify often opts out of capture).
+2. **Android AudioPlaybackCapture** — MediaProjection + `AudioRecord` band energies → feed. **Verified 2026-07-31:** Capture hears Spotify playback on device. Keep **silence ~2s → auto mic fallback** for apps that opt out or when nothing is playing.
 3. **Local file** — file pick → `createMediaElementSource` → same analyser path (full-quality viz, no Spotify required).
 
 **Spotify App Remote** stays **optional chrome** (title / art / skip) — never the beat source.
@@ -99,6 +99,7 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 - Spotify chrome overlays the fullscreen viz (Connect / now-playing / transport) — **optional**
 - **Salvage:** Mic / Capture / File drive real FFT; synth-from-position and audio-analysis API abandoned
 - Capture silence (~2s near-zero RMS) auto-falls back to mic with status toast
+- **Verified 2026-07-31 (Danny):** Capture successfully hears Spotify audio on device — primary path for Spotify + sky, not “expect silence”
 
 ## Success criteria
 
