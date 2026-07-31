@@ -74,8 +74,10 @@ React is out of scope for v1 (and likely longer). A fullscreen visualizer does n
 |---|---|
 | **0 — Spike** | Capacitor Android + Spotify App Remote connect + now-playing + cover art — **complete** (2026-07-29) in `projects/sunwake-mobile/` |
 | **1 — Salvage** | Real audio inputs (Mic / Capture / File) drive FFT; App Remote optional chrome — **landed** 2026-07-29; analysis API abandoned |
-| **2 — Product** | Full FX panel, Supporter IAP → Black Hole suite, tip SKUs, restore |
-| **3 — Polish** | Battery/thermal, background reconnect, store listing, then iOS |
+| **2 — Product** | Full FX panel, Supporter IAP → Black Hole suite, tip SKUs, restore — **required before Play** |
+| **3 — Polish** | Battery/thermal, background reconnect, store listing — **required before Play**; iOS after Android store comfort |
+
+**Play Store policy (locked 2026-07-31):** First public Android release is the **complete** v1 — Phase 2 + Phase 3 store packaging. No free-core soft launch without Support / Supporter / tips.
 
 ### Phase 1 salvage — real audio (2026-07-29)
 
@@ -125,5 +127,11 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 ## Decisions still soft (change anytime)
 
 - Exact Supporter price (suggested ~$2.99–$4.99).
-- Whether tip SKUs ship in v1 or only Supporter.
-- When to start iOS relative to Android store comfort.
+- Exact tip amounts (suggested $0.99 / $2.99 / $4.99) — tips **do** ship in complete v1 (gratitude only).
+- When to start iOS relative to Android store comfort (after complete Android Play ship).
+
+## Decisions locked
+
+- First Play Store Android release = **complete v1** (Phase 2 + Phase 3 packaging). No thin soft launch.
+- Tip SKUs ship with v1; they do not gate features.
+- Core sky free forever; Supporter unlocks Black Hole suite only.
