@@ -44,11 +44,16 @@ Spotify App Remote -.optional.-> now-playing chrome only
 ## App UX (v1)
 
 - Fullscreen Sunwake scene (tap / hide-chrome).
-- Minimal now-playing strip: art, title, artist, play/pause/skip.
+- **Spotify-hero gate** (2026-07-31): primary **Start with Spotify** → share audio (Capture / MediaProjection) → App Remote connect. Mic · File are secondary escapes. Capture is not a free-standing first-run button (lives in the Spotify path + dock).
+- Soft failures: Capture denied stays on gate; Connect fail still leaves the sky on Capture with **Connect Spotify** in chrome; silence ~2s → mic fallback.
+- Resume: after a successful Capture+Connect, next launch labels the hero CTA **Resume Spotify night drive**.
+- Minimal now-playing strip: art, title, artist, play/pause/skip (App Remote chrome only — never the beat source).
 - Effects panel adapted for touch (`FX_TOGGLES` / `FX_LABELS`).
 - **Support** screen: Supporter unlock + tip amounts + restore purchases.
 - Supporter state persisted; Black Hole toggles locked-with-explain until unlocked.
 - Quiet version stamp (Quasar chapter vibe from `version.json`).
+
+Copy principles: never imply Spotify streams into the app or that App Remote analyses audio. MediaProjection = “share audio so the sky can hear what’s playing.” Connect = “show what’s playing · skip tracks.”
 
 ## Technical approach
 
@@ -100,10 +105,11 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 - **Salvage:** Mic / Capture / File drive real FFT; synth-from-position and audio-analysis API abandoned
 - Capture silence (~2s near-zero RMS) auto-falls back to mic with status toast
 - **Verified 2026-07-31 (Danny):** Capture successfully hears Spotify audio on device — primary path for Spotify + sky, not “expect silence”
+- **Gate (2026-07-31):** Spotify-hero CTA runs Capture then App Remote; Mic/File secondary; Connect-later chrome if App Remote fails
 
 ## Success criteria
 
-- Play Spotify → open Sunwake → night-drive feels like the web within one connect tap.
+- Play Spotify → open Sunwake → **Start with Spotify** → share audio + chrome → night-drive feels like the web.
 - Non-supporters never see ads or a broken core sky.
 - Supporters get Black Hole / Quasar suite; tippers get thanks only.
 - Web Sunwake unchanged and free.
