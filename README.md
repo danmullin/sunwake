@@ -28,10 +28,6 @@ Or open `index.html` via any static file server (modules need HTTP, not `file://
 - No songs are bundled — bring your own
 - **B-sides** in the Effects panel are experimental FX (off by default)
 
-## Maintainers
-
-This is the **public** twin of a private visualizer. Never copy private Mist Listen UI over these files.
-
 ```powershell
 node _check-public.js
 node _stamp-version.js   # optional local: date + git SHA into version.json
