@@ -74,7 +74,7 @@ React is out of scope for v1 (and likely longer). A fullscreen visualizer does n
 |---|---|
 | **0 — Spike** | Capacitor Android + Spotify App Remote connect + now-playing + cover art — **complete** (2026-07-29) in `projects/sunwake-mobile/` |
 | **1 — Salvage** | Real audio inputs (Mic / Capture / File) drive FFT; App Remote optional chrome — **landed** 2026-07-29; analysis API abandoned |
-| **2 — Product** | Full FX panel, Supporter IAP → Black Hole suite, tip SKUs, restore — **required before Play** |
+| **2 — Product** | Full FX panel, Supporter IAP → Black Hole suite, tip SKUs, restore — **required before Play** · **UI + Billing wiring landed 2026-08-01** (needs Play Console SKUs + release track to purchase for real) |
 | **3 — Polish** | Battery/thermal, background reconnect, store listing — **required before Play**; iOS after Android store comfort |
 
 **Play Store policy (locked 2026-07-31):** First public Android release is the **complete** v1 — Phase 2 + Phase 3 store packaging. No free-core soft launch without Support / Supporter / tips.
