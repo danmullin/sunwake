@@ -126,7 +126,6 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 
 ## Decisions still soft (change anytime)
 
-- Exact Supporter price (suggested ~$2.99–$4.99).
 - Exact tip amounts (suggested $0.99 / $2.99 / $4.99) — tips **do** ship in complete v1 (gratitude only).
 - When to start iOS relative to Android store comfort (after complete Android Play ship).
 
@@ -134,4 +133,5 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 
 - First Play Store Android release = **complete v1** (Phase 2 + Phase 3 packaging). No thin soft launch.
 - Tip SKUs ship with v1; they do not gate features.
-- Core sky free forever; Supporter unlocks Black Hole suite only.
+- Core sky free forever; **Supporter ($0.99)** unlocks **Black Hole suite** only (`blackHole` + children). Soft lock: toggles visible, explain, never a mid-drive wall.
+- Supporter price locked at **$0.99** (2026-08-01).
