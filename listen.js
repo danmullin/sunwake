@@ -3984,12 +3984,122 @@ function setVizMode(mode) {
 }
 
 function skylineWinFill(hue, a) {
+  if (Array.isArray(hue)) return `rgba(${hue[0]}, ${hue[1]}, ${hue[2]}, ${a})`;
   if (hue === "gold") return `rgba(240, 197, 106, ${a})`;
   if (hue === "pink") return `rgba(255, 110, 168, ${a})`;
   return `rgba(69, 224, 255, ${a})`;
 }
 
-/** Pull analyser bins into a smooth left→right EQ used as building heights. */
+/** Deterministic 0–1 from a seed (fractal city DNA). */
+function skylineRand(seed) {
+  const x = Math.sin(seed * 127.1 + seed * 311.7) * 43758.5453123;
+  return x - Math.floor(x);
+}
+
+function skylinePickPalette(seed) {
+  const a = SW_RAINBOW[(skylineRand(seed + 0.4) * SW_RAINBOW.length) | 0];
+  const g = SW_RAINBOW[(skylineRand(seed + 1.1) * SW_RAINBOW.length) | 0];
+  const cool = skylineRand(seed + 2.2);
+  return {
+    body: [
+      (6 + cool * 22 + skylineRand(seed + 3) * 14) | 0,
+      (5 + skylineRand(seed + 3.5) * 18) | 0,
+      (18 + skylineRand(seed + 4) * 52) | 0,
+    ],
+    bodyHi: [
+      (10 + cool * 28) | 0,
+      (8 + skylineRand(seed + 4.5) * 20) | 0,
+      (28 + skylineRand(seed + 5) * 48) | 0,
+    ],
+    accent: a,
+    glow: g,
+    winHue: skylineRand(seed + 6) * SW_RAINBOW.length,
+    stripe: skylineRand(seed + 7) > 0.42,
+    stripeDir: skylineRand(seed + 8) > 0.5 ? "h" : "v",
+    stripeGap: 2 + ((skylineRand(seed + 9) * 4) | 0),
+  };
+}
+
+/**
+ * Recursive setbacks / twin towers / spires — unique silhouette per seed.
+ * Masses use u,v in building space: v=0 roof, v=1 street.
+ */
+function skylineFractalMasses(seed, maxDepth) {
+  const masses = [];
+  const split = (u0, u1, v0, v1, depth, s) => {
+    const bw = u1 - u0;
+    const bh = v1 - v0;
+    if (depth <= 0 || bh < 0.14 || bw < 0.16) {
+      masses.push({ u0, u1, v0, v1, shade: skylineRand(s) });
+      return;
+    }
+    const r = skylineRand(s);
+    if (r < 0.38) {
+      // Horizontal setback — upper tier narrower
+      const mid = v0 + bh * (0.28 + skylineRand(s + 1) * 0.38);
+      const inset = 0.06 + skylineRand(s + 2) * 0.22;
+      split(u0, u1, mid, v1, depth - 1, s + 3);
+      split(u0 + inset * bw, u1 - inset * bw, v0, mid, depth - 1, s + 7);
+    } else if (r < 0.68) {
+      // Twin / offset towers
+      const gap = 0.04 + skylineRand(s + 1) * 0.12;
+      const midU = u0 + bw * (0.42 + skylineRand(s + 2) * 0.16);
+      const lift = bh * skylineRand(s + 3) * 0.28;
+      split(u0, midU - gap * bw * 0.5, v0 + lift, v1, depth - 1, s + 11);
+      split(midU + gap * bw * 0.5, u1, v0, v1, depth - 1, s + 17);
+    } else {
+      masses.push({ u0, u1, v0, v1, shade: skylineRand(s + 4) });
+      // Spire / antenna
+      if (skylineRand(s + 5) > 0.4) {
+        const cx = (u0 + u1) * 0.5;
+        const sw = bw * (0.06 + skylineRand(s + 6) * 0.14);
+        masses.push({
+          u0: cx - sw,
+          u1: cx + sw,
+          v0: Math.max(0, v0 - (0.08 + skylineRand(s + 7) * 0.14)),
+          v1: v0,
+          shade: 0.9,
+          spire: true,
+        });
+      }
+    }
+  };
+  split(0, 1, 0, 1, maxDepth, seed * 19.7 + 3.1);
+  return masses;
+}
+
+/** Fractal-ish window occupancy — each building gets its own pattern language. */
+function skylineWindowPattern(pattern, r, c, rows, cols, seed) {
+  if (pattern === "sierpinski") {
+    let rr = r + 1;
+    let cc = c + 1;
+    while (rr > 0 || cc > 0) {
+      if (rr % 2 === 1 && cc % 2 === 1) return false;
+      rr = (rr / 2) | 0;
+      cc = (cc / 2) | 0;
+    }
+    return true;
+  }
+  if (pattern === "stripes") {
+    const gap = 1 + ((skylineRand(seed + 20) * 2) | 0);
+    return r % (gap + 1) !== gap;
+  }
+  if (pattern === "columns") {
+    const gap = 1 + ((skylineRand(seed + 21) * 2) | 0);
+    return c % (gap + 1) !== 0;
+  }
+  if (pattern === "diagonal") {
+    return (r + c) % 3 !== 0;
+  }
+  if (pattern === "clusters") {
+    const cell = skylineRand(seed * 0.1 + r * 12.3 + c * 7.7);
+    return cell > 0.28;
+  }
+  // dense grid with organic dropouts
+  return skylineRand(seed + r * 31.7 + c * 17.3) > 0.22;
+}
+
+/** Pull analyser bins into a smooth EQ used as building heights. */
 function updateSkylineEq(now) {
   const n = freq && freq.length ? freq.length : 0;
   for (let i = 0; i < SKYLINE_EQ_N; i++) {
@@ -4143,37 +4253,64 @@ function updateSkylineWinLits(dt) {
 
 function seedSkylineCity() {
   if (!W || !H) return;
+  const PATTERNS = ["grid", "sierpinski", "stripes", "columns", "diagonal", "clusters"];
   // Long seamless strip (~4.5 viewports) so the city rides across before looping.
-  const fill = (arr, minH, maxH, minW, maxW) => {
+  const fill = (arr, minH, maxH, minW, maxW, depthBias) => {
     arr.length = 0;
     let x = 0;
     const target = Math.max(W * 4.5, 3200);
+    let idx = 0;
     while (x < target) {
-      const w = minW + Math.random() * (maxW - minW);
-      const h = minH + Math.random() * (maxH - minH);
-      const gap = 3 + Math.random() * 14;
+      const seed = (idx + 1) * 17.13 + minH * 0.01 + x * 0.003;
+      const w = minW + skylineRand(seed) * (maxW - minW);
+      // Fractal height jitter — occasional landmark towers
+      const landmark = skylineRand(seed + 0.5);
+      const hSpan = maxH - minH;
+      const h =
+        landmark > 0.88
+          ? maxH * (0.92 + skylineRand(seed + 0.6) * 0.35)
+          : minH + skylineRand(seed + 0.7) * hSpan;
+      const gap = 2 + skylineRand(seed + 0.8) * 16;
+      const palette = skylinePickPalette(seed + 9);
+      const depth = Math.max(1, Math.min(3, depthBias + (skylineRand(seed + 1.2) > 0.55 ? 1 : 0)));
+      const masses = skylineFractalMasses(seed + 2.4, depth);
+      const pattern = PATTERNS[(skylineRand(seed + 3.3) * PATTERNS.length) | 0];
       const windows = [];
-      const cols = Math.max(2, Math.floor(w / 9));
-      const rows = Math.max(3, Math.floor(h / 11));
+      const cols = Math.max(2, Math.floor(w / (8 + skylineRand(seed + 4) * 4)));
+      const rows = Math.max(3, Math.floor(h / (9 + skylineRand(seed + 4.5) * 5)));
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          // Denser than before — reads as a lit grid when music hits
-          if (Math.random() > 0.32) {
-            const v = (r + 0.35) / rows;
-            windows.push({
-              u: (c + 0.35) / cols,
-              v,
-              r,
-              c,
-              phase: Math.random() * Math.PI * 2,
-              // Prefer bass near street, air near roof
-              band: v > 0.62 ? "bass" : v < 0.35 ? "air" : "mid",
-            });
-          }
+          if (!skylineWindowPattern(pattern, r, c, rows, cols, seed)) continue;
+          const v = (r + 0.35) / rows;
+          const winT = (palette.winHue + r * 0.07 + c * 0.03) % SW_RAINBOW.length;
+          windows.push({
+            u: (c + 0.3 + skylineRand(seed + r + c * 0.1) * 0.15) / cols,
+            v,
+            r,
+            c,
+            phase: skylineRand(seed + r * 2.1 + c) * Math.PI * 2,
+            band: v > 0.62 ? "bass" : v < 0.35 ? "air" : "mid",
+            color: SW_RAINBOW[winT | 0],
+            colorT: winT,
+          });
         }
       }
-      arr.push({ x, w, h, windows, hue: Math.random(), cols, rows, eqT: 0 });
+      arr.push({
+        x,
+        w,
+        h,
+        windows,
+        hue: skylineRand(seed + 5),
+        cols,
+        rows,
+        eqT: 0,
+        seed,
+        palette,
+        masses,
+        pattern,
+      });
       x += w + gap;
+      idx++;
     }
     // Exact loop period = end of last building (no extra pad — pad caused a dead gap hitch)
     arr.loopW = Math.max(x, W + 1);
@@ -4183,9 +4320,9 @@ function seedSkylineCity() {
       arr[i].eqT = n <= 1 ? 0.5 : i / (n - 1);
     }
   };
-  fill(skylineFar, H * 0.08, H * 0.22, 28, 70);
-  fill(skylineMid, H * 0.14, H * 0.34, 36, 90);
-  fill(skylineNear, H * 0.2, H * 0.42, 44, 110);
+  fill(skylineFar, H * 0.08, H * 0.22, 28, 70, 1);
+  fill(skylineMid, H * 0.14, H * 0.34, 36, 90, 2);
+  fill(skylineNear, H * 0.2, H * 0.42, 44, 110, 2);
   skylineWinLits.length = 0;
 }
 
@@ -4205,31 +4342,84 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
       const x = b.x - off + k * loopW;
       if (x + b.w < -4 || x > W + 4) continue;
       // Per-building band + shared punch — reacts anywhere on screen, not only far-left bass
-      const band = sampleSkylineEq(b.eqT != null ? b.eqT : 0.5);
+      const bandEq = sampleSkylineEq(b.eqT != null ? b.eqT : 0.5);
       const shared = Math.min(1, bass * 0.55 + mid * 0.28 + peak * 0.22 + drive * 0.18);
-      const eq = Math.min(1, band * 0.5 + shared * 0.58 + band * shared * 0.12);
+      const eq = Math.min(1, bandEq * 0.5 + shared * 0.58 + bandEq * shared * 0.12);
       const hMul = 0.32 + eq * (0.95 + drive * 0.25) * eqAmp;
       const liveH = Math.max(4, b.h * hMul + bob * (0.35 + b.hue * 0.4));
       // Base stays planted on groundY — roof rides the spectrum
       const top = groundY - liveH;
       const bh = liveH;
+      const pal = b.palette || {
+        body: [12 + b.hue * 18, 8 + b.hue * 10, 28 + b.hue * 40],
+        bodyHi: [18, 12, 40],
+        accent: [255, 110, 168],
+        glow: [69, 224, 255],
+      };
+      const masses = b.masses && b.masses.length ? b.masses : [{ u0: 0, u1: 1, v0: 0, v1: 1, shade: 0.5 }];
+
       ctx.globalCompositeOperation = "source-over";
-      ctx.fillStyle = `rgba(${12 + b.hue * 18}, ${8 + b.hue * 10}, ${28 + b.hue * 40}, ${alpha})`;
-      ctx.fillRect(x, top, b.w, bh);
-      // Roof lip brightens with this bar's energy
-      const roofA = (0.1 + eq * 0.55 * eqAmp + air * 0.1) * alpha;
-      ctx.fillStyle =
-        eq > 0.55
-          ? `rgba(69, 224, 255, ${roofA})`
-          : eq > 0.3
-            ? `rgba(255, 110, 168, ${roofA})`
-            : `rgba(240, 197, 106, ${roofA * 0.85})`;
-      ctx.fillRect(x, top, b.w, 2);
+      let roofY = top + bh;
+      let roofX0 = x;
+      let roofX1 = x + b.w;
+      for (const m of masses) {
+        const mx = x + m.u0 * b.w;
+        const mw = Math.max(1, (m.u1 - m.u0) * b.w);
+        const my = top + m.v0 * bh;
+        const mh = Math.max(1, (m.v1 - m.v0) * bh);
+        const shade = m.shade != null ? m.shade : 0.5;
+        const br = pal.body[0] + (pal.bodyHi[0] - pal.body[0]) * shade;
+        const bg = pal.body[1] + (pal.bodyHi[1] - pal.body[1]) * shade;
+        const bb = pal.body[2] + (pal.bodyHi[2] - pal.body[2]) * shade;
+        if (m.spire) {
+          ctx.fillStyle = `rgba(${pal.accent[0]}, ${pal.accent[1]}, ${pal.accent[2]}, ${0.35 + eq * 0.4 * alpha})`;
+        } else {
+          ctx.fillStyle = `rgba(${br | 0}, ${bg | 0}, ${bb | 0}, ${alpha})`;
+        }
+        ctx.fillRect(mx, my, mw, mh);
+        // Unique facade stripes / neon seams
+        if (!m.spire && pal.stripe && mw > 6 && mh > 8) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(mx, my, mw, mh);
+          ctx.clip();
+          const gap = (pal.stripeGap || 3) * 3;
+          ctx.strokeStyle = `rgba(${pal.accent[0]}, ${pal.accent[1]}, ${pal.accent[2]}, ${0.08 + eq * 0.12})`;
+          ctx.lineWidth = 1;
+          if (pal.stripeDir === "h") {
+            for (let yy = my + gap; yy < my + mh; yy += gap) {
+              ctx.beginPath();
+              ctx.moveTo(mx, yy);
+              ctx.lineTo(mx + mw, yy);
+              ctx.stroke();
+            }
+          } else {
+            for (let xx = mx + gap; xx < mx + mw; xx += gap) {
+              ctx.beginPath();
+              ctx.moveTo(xx, my);
+              ctx.lineTo(xx, my + mh);
+              ctx.stroke();
+            }
+          }
+          ctx.restore();
+        }
+        if (my < roofY) {
+          roofY = my;
+          roofX0 = mx;
+          roofX1 = mx + mw;
+        }
+      }
+
+      // Roof lip on the tallest mass tip — building's own glow DNA
+      const roofA = (0.12 + eq * 0.55 * eqAmp + air * 0.1) * alpha;
+      const roofCol = eq > 0.5 ? pal.glow : pal.accent;
+      ctx.fillStyle = `rgba(${roofCol[0]}, ${roofCol[1]}, ${roofCol[2]}, ${roofA})`;
+      ctx.fillRect(roofX0, roofY, Math.max(1, roofX1 - roofX0), 2);
       // Soft EQ tip glow on hot bars
       if (eq > 0.28 && eqAmp > 0.5) {
         ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = `rgba(159, 217, 255, ${eq * 0.18 * eqAmp * alpha})`;
-        ctx.fillRect(x, top - 6 - eq * 10, b.w, 8 + eq * 12);
+        ctx.fillStyle = `rgba(${pal.glow[0]}, ${pal.glow[1]}, ${pal.glow[2]}, ${eq * 0.16 * eqAmp * alpha})`;
+        ctx.fillRect(roofX0, roofY - 6 - eq * 10, Math.max(1, roofX1 - roofX0), 8 + eq * 12);
         ctx.globalCompositeOperation = "source-over";
       }
 
@@ -4238,7 +4428,7 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
         const winH = Math.max(2, (bh / (b.rows || 4)) * 0.45);
         ctx.globalCompositeOperation = "lighter";
 
-        // Ambient grid — band by floor, like Night Drive sea rows answering bass/mid/air
+        // Ambient grid — band by floor + each building's color DNA
         for (const win of b.windows) {
           const band =
             win.band === "bass"
@@ -4259,11 +4449,16 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
             (musicHot ? 1 : 0.45) *
             alpha;
           if (a < 0.05) continue;
-          const hue =
-            win.band === "bass" ? "gold" : win.band === "air" ? "cyan" : "pink";
+          const col =
+            win.color ||
+            (win.band === "bass"
+              ? [240, 197, 106]
+              : win.band === "air"
+                ? [69, 224, 255]
+                : [255, 110, 168]);
           const wx = x + win.u * b.w;
           const wy = top + win.v * bh;
-          ctx.fillStyle = skylineWinFill(hue, Math.min(0.95, a));
+          ctx.fillStyle = skylineWinFill(col, Math.min(0.95, a));
           ctx.fillRect(wx, wy, winW, winH);
         }
 
