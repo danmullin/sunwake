@@ -4777,51 +4777,6 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   }
   ctx.restore();
 
-  // Soft geometric wedges — Skyline's sun petals (same language as Night Drive)
-  if (fxOn("sunPetals")) {
-    const energy = Math.max(0, solo * 0.9 + mid * 0.28 - 0.1);
-    if (energy >= 0.05) {
-      const rInner = sunR * (0.95 + energy * 0.08);
-      const rOuter = sunR * (1.55 + energy * 1.35);
-      const petals = 8;
-      const open = 0.32 + energy * 0.48;
-      const rot = now * 0.00012 * (0.35 + energy) + solo * 0.55;
-      const alpha = Math.min(0.55, 0.1 + energy * 0.45);
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.translate(sunX, sunY);
-      ctx.rotate(rot);
-      for (let i = 0; i < petals; i++) {
-        const slot = (Math.PI * 2) / petals;
-        const a0 = i * slot + slot * (1 - open) * 0.5;
-        const a1 = a0 + slot * open;
-        const hueT = i / petals + solo * 0.08 + now * 0.00002;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a0) * rInner, Math.sin(a0) * rInner);
-        ctx.arc(0, 0, rOuter, a0, a1, false);
-        ctx.lineTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
-        ctx.arc(0, 0, rInner, a1, a0, true);
-        ctx.closePath();
-        const grad = ctx.createRadialGradient(0, 0, rInner * 0.4, 0, 0, rOuter);
-        grad.addColorStop(0, synthRainbow(hueT, alpha * 0.35));
-        grad.addColorStop(0.45, synthRainbow(hueT + 0.12, alpha * 0.7));
-        grad.addColorStop(0.82, synthRainbow(hueT + 0.22, alpha * 0.35));
-        grad.addColorStop(1, synthRainbow(hueT + 0.3, 0));
-        ctx.fillStyle = grad;
-        ctx.fill();
-        ctx.strokeStyle = synthRainbow(hueT + 0.18, alpha * 0.45);
-        ctx.lineWidth = 1 + energy * 1.2;
-        ctx.stroke();
-      }
-      ctx.beginPath();
-      ctx.arc(0, 0, rInner * (0.92 + energy * 0.08), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 220, 180, ${0.08 + energy * 0.2})`;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-
   // Anamorphic flare streak on hits
   if (peak > 0.18 || snare > 0.3 || bass > 0.4) {
     ctx.save();
@@ -4889,6 +4844,51 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     ctx.fill();
   }
   ctx.restore();
+
+  // Petals after the disk — wedges sit on top and blend the sun into the sky
+  if (fxOn("sunPetals")) {
+    const energy = Math.max(0, solo * 0.9 + mid * 0.28 - 0.1);
+    if (energy >= 0.05) {
+      const rInner = sunR * (0.95 + energy * 0.08);
+      const rOuter = sunR * (1.55 + energy * 1.35);
+      const petals = 8;
+      const open = 0.32 + energy * 0.48;
+      const rot = now * 0.00012 * (0.35 + energy) + solo * 0.55;
+      const alpha = Math.min(0.55, 0.1 + energy * 0.45);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.translate(sunX, sunY);
+      ctx.rotate(rot);
+      for (let i = 0; i < petals; i++) {
+        const slot = (Math.PI * 2) / petals;
+        const a0 = i * slot + slot * (1 - open) * 0.5;
+        const a1 = a0 + slot * open;
+        const hueT = i / petals + solo * 0.08 + now * 0.00002;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a0) * rInner, Math.sin(a0) * rInner);
+        ctx.arc(0, 0, rOuter, a0, a1, false);
+        ctx.lineTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
+        ctx.arc(0, 0, rInner, a1, a0, true);
+        ctx.closePath();
+        const grad = ctx.createRadialGradient(0, 0, rInner * 0.4, 0, 0, rOuter);
+        grad.addColorStop(0, synthRainbow(hueT, alpha * 0.35));
+        grad.addColorStop(0.45, synthRainbow(hueT + 0.12, alpha * 0.7));
+        grad.addColorStop(0.82, synthRainbow(hueT + 0.22, alpha * 0.35));
+        grad.addColorStop(1, synthRainbow(hueT + 0.3, 0));
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = synthRainbow(hueT + 0.18, alpha * 0.45);
+        ctx.lineWidth = 1 + energy * 1.2;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(0, 0, rInner * (0.92 + energy * 0.08), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 220, 180, ${0.08 + energy * 0.2})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
 }
 
 /**
