@@ -4312,8 +4312,7 @@ function updateSkylineWinLits(dt) {
 
 /**
  * Buildings throw a party — kicks/snares/hats burst confetti from rooftops.
- * Particles live on the city strip (same scroll as their layer) so they leave the
- * roof into the world — not stuck to the camera.
+ * Initial velocity matches the building's scroll so sparks ride with the tower.
  */
 function spawnSkylineParty(kind, strength = 0.5) {
   if (vizMode !== "skyline" || !fxOn("sparks") || !playing || !W) return;
@@ -4321,8 +4320,10 @@ function spawnSkylineParty(kind, strength = 0.5) {
   const buildings = skylineLayerByName(layerName);
   if (!buildings.length) return;
   const scrollMul = layerName === "near" ? 1.0 : layerName === "mid" ? 0.5 : 0.18;
-  const loopW = buildings.loopW || W * 4;
+  // Buildings move left on screen as scroll advances — particles inherit that velocity
+  const buildingVx = -scrollMul * skylineDriveSmooth * SKYLINE_SCROLL_RATE;
   const scroll = skylineScrollPx * scrollMul;
+  const loopW = buildings.loopW || W * 4;
   const off = ((scroll % loopW) + loopW) % loopW;
   const groundY = H * 0.62;
   const candidates = [];
@@ -4331,7 +4332,7 @@ function spawnSkylineParty(kind, strength = 0.5) {
     for (let k = -1; k <= 1; k++) {
       const x = b.x - off + k * loopW;
       if (x + b.w < 8 || x > W - 8) continue;
-      candidates.push({ b, x, stripX: b.x + k * loopW });
+      candidates.push({ b, x });
     }
   }
   if (!candidates.length) return;
@@ -4349,6 +4350,7 @@ function spawnSkylineParty(kind, strength = 0.5) {
     }
     const top = groundY - pick.b.h;
     const roofY = top + roofV * pick.b.h;
+    const cx = pick.x + pick.b.w * (0.25 + Math.random() * 0.5);
     const palette = pick.b.palette;
     const count =
       kind === "kick"
@@ -4371,15 +4373,14 @@ function spawnSkylineParty(kind, strength = 0.5) {
             ? palette.accent
             : palette.glow
           : SW_RAINBOW[(Math.random() * SW_RAINBOW.length) | 0];
-      const local = pick.b.w * (0.25 + Math.random() * 0.5);
+      // Burst is relative to the building; add buildingVx so confetti rides with the tower
+      const relVx = Math.cos(ang) * speed + (Math.random() - 0.5) * 1.2;
+      const relVy = Math.sin(ang) * speed - 0.5 - Math.random() * 1.8;
       skylineParty.push({
-        // Strip coordinate (same space as building.x) — screen = stripX - scrollOff
-        stripX: pick.stripX + local,
+        x: cx + (Math.random() - 0.5) * pick.b.w * 0.35,
         y: roofY + Math.random() * 4,
-        vx: Math.cos(ang) * speed + (Math.random() - 0.5) * 1.2,
-        vy: Math.sin(ang) * speed - 0.5 - Math.random() * 1.8,
-        scrollMul,
-        loopW,
+        vx: buildingVx + relVx,
+        vy: relVy,
         life: 1,
         decay: kind === "hat" ? 0.022 + Math.random() * 0.02 : 0.011 + Math.random() * 0.016,
         r: kind === "kick" ? 1.6 + Math.random() * 3.4 : 1.0 + Math.random() * 2.4,
@@ -4389,16 +4390,10 @@ function spawnSkylineParty(kind, strength = 0.5) {
         rot: Math.random() * Math.PI * 2,
         grav: kind === "kick" ? 0.14 : kind === "snare" ? 0.1 : 0.07,
         confetti: kind === "kick" || (kind === "snare" && Math.random() > 0.55),
+        buildingVx,
       });
     }
   }
-}
-
-function skylinePartyScreenX(p) {
-  const loopW = p.loopW || W * 4;
-  const scroll = skylineScrollPx * (p.scrollMul || 1);
-  const off = ((scroll % loopW) + loopW) % loopW;
-  return p.stripX - off;
 }
 
 function updateSkylineParty(dt) {
@@ -4410,14 +4405,15 @@ function updateSkylineParty(dt) {
   for (let i = skylineParty.length - 1; i >= 0; i--) {
     const p = skylineParty[i];
     p.vy += p.grav * t;
-    p.vx *= 0.992;
-    // Burst moves in strip space; scroll pulls them across screen with the city
-    p.stripX += p.vx * t;
+    // Drag only the burst relative to the building — keep inherited cruise
+    const baseVx = p.buildingVx || 0;
+    const relVx = p.vx - baseVx;
+    p.vx = baseVx + relVx * 0.992;
+    p.x += p.vx * t;
     p.y += p.vy * t;
     p.rot += p.spin * t;
     p.life -= p.decay * t;
-    const screenX = skylinePartyScreenX(p);
-    if (p.life <= 0 || p.y > H + 30 || screenX < -60 || screenX > W + 60) {
+    if (p.life <= 0 || p.y > H + 30 || p.x < -40 || p.x > W + 40) {
       skylineParty.splice(i, 1);
     }
   }
@@ -4430,11 +4426,10 @@ function drawSkylineParty() {
   for (const p of skylineParty) {
     const a = Math.max(0, p.life);
     if (a < 0.04) continue;
-    const x = skylinePartyScreenX(p);
     const [cr, cg, cb] = p.hue || [69, 224, 255];
     if (p.confetti) {
       ctx.save();
-      ctx.translate(x, p.y);
+      ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${a * 0.9})`;
       const w = p.r * (0.9 + a * 0.5);
@@ -4442,15 +4437,16 @@ function drawSkylineParty() {
       ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
       ctx.restore();
     } else {
+      // Spark streak
       ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${a})`;
       ctx.lineWidth = Math.max(1, p.r * 0.55);
       ctx.beginPath();
-      ctx.moveTo(x, p.y);
-      ctx.lineTo(x - p.vx * 1.8, p.y - p.vy * 1.8);
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 1.8, p.y - p.vy * 1.8);
       ctx.stroke();
       ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${a})`;
       ctx.beginPath();
-      ctx.arc(x, p.y, Math.max(0.8, p.r * 0.35), 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, Math.max(0.8, p.r * 0.35), 0, Math.PI * 2);
       ctx.fill();
     }
   }
