@@ -29,7 +29,7 @@ Or open `index.html` via any static file server (modules need HTTP, not `file://
 
 ## Code layout
 
-Entry is thin [`listen.js`](listen.js) → [`lib/app.js`](lib/app.js) (`SunwakeApp`). Services and scenes live under [`lib/`](lib/); the migrated engine is [`lib/runtime.js`](lib/runtime.js). Native ES modules — no bundler.
+Entry is thin [`listen.js`](listen.js) → [`lib/app.js`](lib/app.js) (`SunwakeApp`). Logic lives under [`lib/`](lib/) as real ES modules (`state`, `audio`, `simulation`, `grid`, `particles`, `scenes/*`, `boot`, `renderer`). Native ES modules — no bundler.
 
 ## Listen
 

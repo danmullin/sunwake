@@ -1,5 +1,10 @@
 /**
- * Build Sunwake lib/ modules from listen.js (or backup).
+ * DEPRECATED — do not regenerate the live lib/ tree from this script.
+ * Ownership now lives in hand-maintained modules (state/audio/grid/particles/
+ * simulation/scenes/boot/renderer). Kept only as archaeology next to
+ * listen.monolith.bak.js.
+ *
+ * Historical behavior:
  * 1) lib/runtime.js — full implementation, boot deferred to startRuntime()
  * 2) OOP facades under lib/ that dispatch into runtime
  * 3) Thin listen.js entry
