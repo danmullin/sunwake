@@ -8,7 +8,7 @@ Restored 2026-07-28 after the in-chat plan card was deleted. Updated 2026-08-02.
 - **What it is not:** Another MilkDrop preset browser, ad-supported equalizer, or paywalled core experience.
 - **Web stays free:** `projects/sunwake` on Pages keeps working as today (local file + system-audio capture). Mobile is the Capacitor sibling.
 - **Brand:** default eyebrow is **NIGHT DRIVE**. After Spotify App Remote connects, it becomes **NIGHT DRIVE · FOR SPOTIFY**. Capture already hears any playing app; Spotify is optional chrome, not the beat.
-- **Web scenes (2026-08-03):** Night Drive + **Rain Drive** (storm cousin — wet asphalt, neon reflections, hat wipers) + **Skyline** (side-view highway/skyline strip). Skyline is **web-first** — bake into mobile only after it feels ready on Pages. Rain Drive ships with the Night Drive family (same Effects panel).
+- **Web scenes (2026-08-03):** Night Drive + **Rain Drive** (storm cousin — cloudy overcast, wet asphalt, drum lightning) + **Skyline** (side-view highway/skyline strip). Skyline is **web-first** — bake into mobile only after it feels ready on Pages. Rain Drive ships with the Night Drive family (same Effects panel).
 
 ## Monetization (locked)
 

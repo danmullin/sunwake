@@ -41,17 +41,16 @@ function vizModeLabel(mode = vizMode) {
   return "night drive";
 }
 
-/** Rain Drive — dual windshield wipers (screen-space arcs). */
-const wipers = [
-  { pivotX: 0.18, phase: 0.2, active: 0 },
-  { pivotX: 0.82, phase: Math.PI + 0.4, active: 0 },
-];
-let wiperPulse = 0;
+/** Rain Drive — overcast clouds + lightning (no windshield). */
+const stormClouds = [];
+const lightningBolts = [];
+const LIGHTNING_MAX = 6;
 /** Road splash sparks on wet asphalt (Rain Drive). */
 const rainSplashes = [];
 const RAIN_SPLASH_MAX = 48;
-/** Brief storm flash (0..1). */
+/** Brief storm flash (0..1) — sky bloom when bolts fire. */
 let stormFlash = 0;
+let lastLightningAt = 0;
 
 /** Side-scroll city for Skyline mode — regenerated on resize. */
 const skylineFar = [];
@@ -1312,7 +1311,9 @@ function seedWorld() {
   shooting.length = 0;
   rainSplashes.length = 0;
   stormFlash = 0;
-  wiperPulse = 0;
+  lastLightningAt = 0;
+  lightningBolts.length = 0;
+  seedStormClouds();
   horizonBands.length = 0;
   meteors.length = 0;
   mirrorCells.length = 0;
@@ -1978,9 +1979,6 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   }
   if (hatFire) {
     spawnDrum("hat");
-    if (vizMode === "rainDrive") {
-      triggerWipers(Math.min(1, 0.45 + hat * 0.9 + air * 0.25));
-    }
     if (fxOn("infallSparks") && fxOn("blackHole")) {
       spawnInfall(0.35 + hat * 0.65);
     }
@@ -2002,8 +2000,20 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
     if (kickFire || (peakKick > 0.06 && peak > 0.2)) {
       spawnRainSplash(0.55 + bass * 0.5 + peak * 0.35);
     }
-    if (peakKick > 0.08 && peak > 0.28) {
-      stormFlash = Math.min(1, stormFlash + 0.35 + peak * 0.45);
+    // Lightning bolts — kicks / snares / hard peaks crack the cloudy sky
+    const boltHit =
+      kickFire ||
+      (snareFire && snare > 0.18) ||
+      (peakKick > 0.09 && peak > 0.3);
+    if (boltHit && now - lastLightningAt > 90) {
+      const power = Math.min(
+        1,
+        (kickFire ? 0.55 + bass * 0.5 : 0) +
+          (snareFire ? 0.4 + snare * 0.45 : 0) +
+          peak * 0.35,
+      );
+      spawnLightning(power, kickFire ? "kick" : snareFire ? "snare" : "peak");
+      lastLightningAt = now;
     }
   }
 
@@ -2270,7 +2280,16 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   }
 
   if (vizMode === "rainDrive") {
-    updateWipers();
+    for (const c of stormClouds) {
+      c.x += c.drift;
+      if (c.x < -0.45) c.x = 1.35;
+      if (c.x > 1.35) c.x = -0.45;
+    }
+    for (let i = lightningBolts.length - 1; i >= 0; i--) {
+      const b = lightningBolts[i];
+      b.life -= b.decay;
+      if (b.life <= 0) lightningBolts.splice(i, 1);
+    }
     for (let i = rainSplashes.length - 1; i >= 0; i--) {
       const s = rainSplashes[i];
       s.x += s.vx;
@@ -2279,11 +2298,11 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       s.life -= s.decay;
       if (s.life <= 0) rainSplashes.splice(i, 1);
     }
-    stormFlash *= 0.88;
-  } else if (rainSplashes.length) {
+    stormFlash *= 0.82;
+  } else if (rainSplashes.length || lightningBolts.length) {
     rainSplashes.length = 0;
+    lightningBolts.length = 0;
     stormFlash = 0;
-    wiperPulse = 0;
   }
 
   for (const sheet of mistSheets) {
@@ -4064,15 +4083,17 @@ function setVizMode(mode) {
     gridCells.length = 0;
     gridTrails.length = 0;
     rainSplashes.length = 0;
+    lightningBolts.length = 0;
     stormFlash = 0;
-    wiperPulse = 0;
   } else {
     skylineWinLits.length = 0;
     skylineParty.length = 0;
     if (vizMode !== "rainDrive") {
       rainSplashes.length = 0;
+      lightningBolts.length = 0;
       stormFlash = 0;
-      wiperPulse = 0;
+    } else if (!stormClouds.length) {
+      seedStormClouds();
     }
   }
   syncVizModeUi();
@@ -4984,20 +5005,69 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   }
 }
 
-function triggerWipers(strength) {
-  wiperPulse = Math.min(1, Math.max(wiperPulse, 0.55 + strength * 0.45));
-  for (const w of wipers) {
-    w.active = Math.min(1, w.active + 0.55 + strength * 0.45);
+function seedStormClouds() {
+  stormClouds.length = 0;
+  // Dense overcast — overlapping soft masses so the sky reads cloudy, not starry
+  for (let i = 0; i < 22; i++) {
+    const band = i < 8 ? 0 : i < 15 ? 1 : 2;
+    stormClouds.push({
+      x: (i * 0.13 + Math.random() * 0.08) % 1.2 - 0.1,
+      y: band === 0 ? 0.02 + Math.random() * 0.1 : band === 1 ? 0.1 + Math.random() * 0.12 : 0.2 + Math.random() * 0.14,
+      w: 0.34 + Math.random() * 0.48,
+      h: 0.09 + Math.random() * 0.12,
+      drift: (Math.random() - 0.5) * (0.0001 + band * 0.00003),
+      alpha: 0.32 + Math.random() * 0.28 + (2 - band) * 0.08,
+      cool: Math.random(),
+    });
   }
 }
 
-function updateWipers() {
-  const drive = 0.028 + wiperPulse * 0.09;
-  wiperPulse *= 0.93;
-  for (const w of wipers) {
-    w.phase += drive * (0.75 + w.active * 1.4);
-    w.active *= 0.962;
+function jaggedBoltPath(x0, y0, x1, y1, segs, jag) {
+  const pts = [{ x: x0, y: y0 }];
+  for (let i = 1; i < segs; i++) {
+    const t = i / segs;
+    const nx = x0 + (x1 - x0) * t + (Math.random() - 0.5) * jag * (1 - Math.abs(t - 0.5) * 0.4);
+    const ny = y0 + (y1 - y0) * t + (Math.random() - 0.5) * jag * 0.35;
+    pts.push({ x: nx, y: ny });
   }
+  pts.push({ x: x1, y: y1 });
+  return pts;
+}
+
+function spawnLightning(strength, kind = "kick") {
+  while (lightningBolts.length >= LIGHTNING_MAX) lightningBolts.shift();
+
+  const x0 = 0.12 + Math.random() * 0.76;
+  const y0 = 0.06 + Math.random() * 0.16;
+  const reach =
+    kind === "snare"
+      ? 0.38 + Math.random() * 0.18
+      : kind === "peak"
+        ? 0.42 + Math.random() * 0.2
+        : 0.48 + Math.random() * 0.22;
+  const x1 = x0 + (Math.random() - 0.5) * 0.28;
+  const y1 = Math.min(0.72, y0 + reach);
+  const segs = 7 + ((strength * 6) | 0);
+  const main = jaggedBoltPath(x0, y0, x1, y1, segs, 0.045 + strength * 0.04);
+  const branches = [];
+  const branchN = strength > 0.55 ? 1 + ((Math.random() * 2) | 0) : Math.random() > 0.45 ? 1 : 0;
+  for (let b = 0; b < branchN; b++) {
+    const from = 2 + ((Math.random() * (main.length - 3)) | 0);
+    const p = main[from];
+    const bx = p.x + (Math.random() > 0.5 ? 1 : -1) * (0.06 + Math.random() * 0.12);
+    const by = p.y + 0.08 + Math.random() * 0.16;
+    branches.push(jaggedBoltPath(p.x, p.y, bx, by, 4 + ((Math.random() * 3) | 0), 0.03));
+  }
+
+  lightningBolts.push({
+    main,
+    branches,
+    life: 1,
+    decay: 0.055 + Math.random() * 0.04,
+    strength: Math.min(1, strength),
+    hue: kind === "snare" ? "pink" : kind === "peak" ? "gold" : "cyan",
+  });
+  stormFlash = Math.min(1, stormFlash + 0.45 + strength * 0.5);
 }
 
 function spawnRainSplash(strength) {
@@ -5019,30 +5089,113 @@ function spawnRainSplash(strength) {
 
 function drawStormSky(now, bass, mid) {
   const g = ctx.createLinearGradient(0, 0, 0, H);
-  g.addColorStop(0, "#02040a");
-  g.addColorStop(0.35, `rgb(${4 + mid * 10}, ${10 + bass * 14}, ${18 + mid * 22})`);
-  g.addColorStop(0.68, `rgb(${6 + bass * 8}, ${18 + mid * 16}, ${28 + bass * 18})`);
-  g.addColorStop(1, "#030a12");
+  g.addColorStop(0, "#05070c");
+  g.addColorStop(0.28, `rgb(${10 + mid * 8}, ${12 + bass * 10}, ${18 + mid * 14})`);
+  g.addColorStop(0.55, `rgb(${14 + bass * 6}, ${18 + mid * 12}, ${28 + bass * 10})`);
+  g.addColorStop(0.78, `rgb(${8 + mid * 6}, ${22 + bass * 8}, ${32 + mid * 10})`);
+  g.addColorStop(1, "#040910");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 
-  // Cool storm shafts — muted cyan, not golden hour
-  const cx = W * 0.5;
-  for (let i = -2; i <= 2; i++) {
-    const x = cx + i * W * 0.11;
-    const shaft = ctx.createLinearGradient(x, 0, x, H * 0.65);
-    shaft.addColorStop(0, `rgba(90, 160, 210, ${0.02 + bass * 0.035 + mid * 0.02})`);
-    shaft.addColorStop(1, "rgba(90, 160, 210, 0)");
-    ctx.fillStyle = shaft;
-    ctx.fillRect(x - W * 0.07, 0, W * 0.14, H * 0.65);
-  }
+  // Soft sun glow trapped under the cloud deck
+  const sx = W * 0.5;
+  const sy = H * 0.28;
+  const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, H * 0.35);
+  glow.addColorStop(0, `rgba(255, 160, 110, ${0.07 + bass * 0.08})`);
+  glow.addColorStop(0.45, `rgba(180, 100, 90, ${0.04 + mid * 0.04})`);
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H * 0.55);
 
   if (stormFlash > 0.04) {
-    ctx.fillStyle = `rgba(200, 220, 255, ${stormFlash * 0.22})`;
-    ctx.fillRect(0, 0, W, H * 0.55);
-    ctx.fillStyle = `rgba(140, 180, 220, ${stormFlash * 0.08})`;
-    ctx.fillRect(0, H * 0.45, W, H * 0.2);
+    ctx.fillStyle = `rgba(210, 230, 255, ${stormFlash * 0.28})`;
+    ctx.fillRect(0, 0, W, H * 0.58);
+    ctx.fillStyle = `rgba(160, 190, 230, ${stormFlash * 0.1})`;
+    ctx.fillRect(0, H * 0.4, W, H * 0.25);
   }
+}
+
+function drawStormClouds(now, bass, mid) {
+  if (!stormClouds.length) seedStormClouds();
+  const horizon = H * 0.52;
+  ctx.save();
+  for (const c of stormClouds) {
+    const x = c.x * W;
+    const y = c.y * H;
+    const rw = c.w * W;
+    const rh = c.h * H;
+    const a = Math.min(0.72, c.alpha + mid * 0.08 + bass * 0.04 + stormFlash * 0.12);
+    const cool = c.cool;
+    const r = (18 + cool * 22) | 0;
+    const g = (22 + (1 - cool) * 18 + mid * 10) | 0;
+    const b = (32 + cool * 28 + bass * 12) | 0;
+    const blob = ctx.createRadialGradient(x, y, 0, x, y, Math.max(rw, rh));
+    blob.addColorStop(0, `rgba(${r + 20}, ${g + 18}, ${b + 24}, ${a})`);
+    blob.addColorStop(0.45, `rgba(${r}, ${g}, ${b}, ${a * 0.75})`);
+    blob.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    ctx.fillStyle = blob;
+    ctx.beginPath();
+    ctx.ellipse(x, y, rw, rh, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Slight underside shadow so the deck reads heavier
+    ctx.fillStyle = `rgba(4, 6, 12, ${a * 0.25})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y + rh * 0.35, rw * 0.85, rh * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Soft haze band where clouds meet the highway sky
+  const haze = ctx.createLinearGradient(0, horizon * 0.55, 0, horizon);
+  haze.addColorStop(0, "rgba(20, 28, 42, 0)");
+  haze.addColorStop(0.6, `rgba(16, 24, 38, ${0.18 + mid * 0.1})`);
+  haze.addColorStop(1, `rgba(8, 14, 24, ${0.35 + bass * 0.08})`);
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, horizon * 0.55, W, horizon * 0.45);
+  ctx.restore();
+}
+
+function strokeBolt(pts, width, color) {
+  if (!pts || pts.length < 2) return;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x * W, pts[0].y * H);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i].x * W, pts[i].y * H);
+  }
+  ctx.stroke();
+}
+
+function drawLightningBolts() {
+  if (!lightningBolts.length) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const bolt of lightningBolts) {
+    const a = Math.min(1, bolt.life * 1.2);
+    if (a < 0.05) continue;
+    const core =
+      bolt.hue === "pink"
+        ? `rgba(255, 160, 210, ${a})`
+        : bolt.hue === "gold"
+          ? `rgba(255, 230, 180, ${a})`
+          : `rgba(210, 235, 255, ${a})`;
+    const glow =
+      bolt.hue === "pink"
+        ? `rgba(255, 110, 168, ${a * 0.45})`
+        : bolt.hue === "gold"
+          ? `rgba(240, 197, 106, ${a * 0.4})`
+          : `rgba(69, 224, 255, ${a * 0.4})`;
+    const w = 1.2 + bolt.strength * 2.2;
+    strokeBolt(bolt.main, w * 3.2, glow);
+    strokeBolt(bolt.main, w, core);
+    strokeBolt(bolt.main, Math.max(0.8, w * 0.35), `rgba(255, 255, 255, ${a * 0.9})`);
+    for (const br of bolt.branches) {
+      strokeBolt(br, w * 1.6, glow);
+      strokeBolt(br, w * 0.55, core);
+    }
+  }
+  ctx.restore();
 }
 
 function drawWetAsphalt(now, bass, mid, air) {
@@ -5115,65 +5268,11 @@ function drawWetAsphalt(now, bass, mid, air) {
     ctx.fill();
   }
 
-  ctx.restore();
-}
-
-function drawWipers() {
-  if (vizMode !== "rainDrive") return;
-  const len = Math.min(W, H) * 0.78;
-  ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  for (const w of wipers) {
-    const px = w.pivotX * W;
-    const py = H * 1.02;
-    const swing = Math.sin(w.phase) * (0.72 + w.active * 0.28);
-    const angle = -Math.PI / 2 + swing * (w.pivotX < 0.5 ? 1 : -1);
-    const tipX = px + Math.cos(angle) * len;
-    const tipY = py + Math.sin(angle) * len;
-    const a = 0.12 + w.active * 0.55 + wiperPulse * 0.25;
-    if (a < 0.08) continue;
-
-    // Cleared wedge ghost
-    ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = `rgba(8, 14, 28, ${0.04 + w.active * 0.06})`;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    const sweep = 0.14 + w.active * 0.1;
-    ctx.arc(px, py, len, angle - sweep, angle + sweep);
-    ctx.closePath();
-    ctx.fill();
-
-    // Blade
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = `rgba(200, 230, 255, ${a * 0.85})`;
-    ctx.lineWidth = 2.2 + w.active * 2.5;
-    ctx.beginPath();
-    ctx.moveTo(px, py);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-
-    // Soft neon arc trail
-    ctx.strokeStyle = `rgba(69, 224, 255, ${a * 0.35})`;
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(px, py, len * 0.98, angle - sweep * 0.8, angle + sweep * 0.8);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(255, 110, 168, ${a * 0.18})`;
-    ctx.beginPath();
-    ctx.arc(px, py, len * 0.92, angle - sweep * 0.5, angle + sweep * 0.5);
-    ctx.stroke();
+  // Lightning reflection flicker on the wet road
+  if (stormFlash > 0.08) {
+    ctx.fillStyle = `rgba(200, 220, 255, ${stormFlash * 0.12})`;
+    ctx.fillRect(0, horizon, W, seaH * 0.35);
   }
-
-  // Rain-beaded windshield vignette
-  const bead = ctx.createRadialGradient(W * 0.5, H * 0.35, H * 0.1, W * 0.5, H * 0.5, H * 0.85);
-  bead.addColorStop(0, "rgba(0,0,0,0)");
-  bead.addColorStop(0.65, "rgba(0,0,0,0)");
-  bead.addColorStop(1, `rgba(2, 6, 14, ${0.18 + wiperPulse * 0.12})`);
-  ctx.globalCompositeOperation = "source-over";
-  ctx.fillStyle = bead;
-  ctx.fillRect(0, 0, W, H);
 
   ctx.restore();
 }
@@ -5317,23 +5416,30 @@ function drawNightDrive(now, bass, mid, air, peak, snare, hat, solo) {
   updateCamera(now, bass, mid, air, peak, snare);
   applyWorldTransform();
 
-  if (storm) drawStormSky(now, bass, mid);
-  else drawSky(now, bass, mid);
-  // Storm dims the starfield — clouds ate half the sky
-  drawStars(now, storm ? air * 0.45 : air, mid, storm ? solo * 0.55 : solo, bass);
+  if (storm) {
+    drawStormSky(now, bass, mid);
+    drawStormClouds(now, bass, mid);
+  } else {
+    drawSky(now, bass, mid);
+  }
+  // Storm: stars nearly gone under the cloud deck
+  if (!storm) drawStars(now, air, mid, solo, bass);
+  else drawStars(now, air * 0.12, mid, solo * 0.15, bass);
   if (fxOn("harmonyConstellation") && !storm) drawHarmonyConstellation(bass, solo);
-  if (fxOn("shootingStars")) drawShootingStars(bass, solo);
+  if (fxOn("shootingStars") && !storm) drawShootingStars(bass, solo);
   if (fxOn("soloAurora") && !storm) drawSoloAurora(solo, air);
-  if (fxOn("cloudDeck")) drawCloudDeck(now);
+  if (fxOn("cloudDeck") && !storm) drawCloudDeck(now);
   if (fxOn("melodyThread")) drawMelodyThread();
   if (fxOn("sunPetals") && !storm) drawSunPetals(now, mid, solo);
-  drawSoftSun(bass, mid, storm ? solo * 0.65 : solo);
-  drawHeartbeatRing(bass, mid);
+  // Soft sun still peeks under the overcast — quieter than clear Night Drive
+  if (storm) drawSoftSun(bass * 0.55, mid * 0.5, solo * 0.2);
+  else drawSoftSun(bass, mid, solo);
+  if (!storm) drawHeartbeatRing(bass, mid);
   drawUsPresence(bass, mid, air);
   if (fxOn("chordHalos")) drawChordHalos();
   if (fxOn("hammerRipples")) drawHammerRipples();
   if (fxOn("shockRings") && !storm) drawShocks();
-  if (fxOn("horizonRibbons")) drawHorizonRibbons(now, bass, mid, solo);
+  if (fxOn("horizonRibbons") && !storm) drawHorizonRibbons(now, bass, mid, solo);
   drawHorizon(bass);
   if (fxOn("bassMountain")) drawBassMountain(bass);
   if (fxOn("mirrorSea") || storm) drawMirrorSea();
@@ -5345,11 +5451,11 @@ function drawNightDrive(now, bass, mid, air, peak, snare, hat, solo) {
   if (fxOn("rain") || storm) drawRain(mid);
   if (fxOn("fog") || storm) drawFog(now, bass);
   if (fxOn("dew") || storm) drawDew(now, air, mid);
+  if (storm) drawLightningBolts();
   if (fxOn("sparks")) drawSparks(bass, solo);
   if (fxOn("streaks")) drawStreaks();
 
   resetScreenTransform();
-  if (storm) drawWipers();
 }
 
 function frame(now) {
