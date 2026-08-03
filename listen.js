@@ -4736,26 +4736,75 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   }
   ctx.restore();
 
-  // Sun behind skyline — center near tall roofs so it peeks over, not clears them
+  // Sun behind skyline — ominous disk with a cloud wake trailing through the haze
   const sunX = W * 0.22;
   const sunR = Math.min(W, H) * (0.1 + (fxOn("sunPulse") ? bass * 0.05 : 0)) * SUN_SCALE * 0.85;
   const sunY = tallRoofY + sunR * 0.45;
-  const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3.2);
-  sunGlow.addColorStop(0, `rgba(255, 200, 120, ${0.35 + bass * 0.25})`);
-  sunGlow.addColorStop(0.35, `rgba(255, 110, 168, ${0.18 + mid * 0.15})`);
-  sunGlow.addColorStop(1, "rgba(69, 224, 255, 0)");
+
+  // Cloud wake — soft bruise streaming off the sun (drawn under the disk)
+  ctx.save();
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5;
+    const drift = Math.sin(now * 0.00035 + i * 0.9) * sunR * 0.2;
+    const wx = sunX + sunR * (0.4 + t * 5.2);
+    const wy = sunY + drift + (i - 2.5) * sunR * 0.18;
+    const ww = sunR * (2.4 + t * 5.5);
+    const wh = sunR * (0.45 + (1 - t) * 0.55);
+    const wake = ctx.createRadialGradient(wx, wy, 0, wx, wy, ww);
+    const a0 = (0.16 - t * 0.02) * (0.75 + mid * 0.25);
+    wake.addColorStop(0, `rgba(28, 12, 36, ${a0})`);
+    wake.addColorStop(0.35, `rgba(70, 22, 48, ${a0 * 0.55})`);
+    wake.addColorStop(0.7, `rgba(40, 18, 55, ${a0 * 0.22})`);
+    wake.addColorStop(1, "rgba(10, 8, 20, 0)");
+    ctx.fillStyle = wake;
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, ww, wh, -0.06 + i * 0.015, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Lit lip — sun catching the near edge of the wake
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 3; i++) {
+    const t = i / 3;
+    const lx = sunX + sunR * (0.85 + t * 1.8);
+    const ly = sunY + Math.sin(now * 0.0005 + i) * sunR * 0.12;
+    const lip = ctx.createRadialGradient(lx, ly, 0, lx, ly, sunR * (1.2 + t));
+    lip.addColorStop(0, `rgba(255, 90, 110, ${0.07 - t * 0.02})`);
+    lip.addColorStop(0.5, `rgba(180, 60, 100, ${0.04 - t * 0.01})`);
+    lip.addColorStop(1, "rgba(80, 30, 60, 0)");
+    ctx.fillStyle = lip;
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, sunR * (1.4 + t * 1.2), sunR * 0.35, -0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Bruised corona — wider, darker, less cheerful than a clean synth sun
+  const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3.6);
+  sunGlow.addColorStop(0, `rgba(255, 140, 80, ${0.28 + bass * 0.2})`);
+  sunGlow.addColorStop(0.25, `rgba(200, 50, 70, ${0.2 + mid * 0.12})`);
+  sunGlow.addColorStop(0.55, `rgba(90, 30, 70, ${0.12 + solo * 0.08})`);
+  sunGlow.addColorStop(1, "rgba(20, 10, 30, 0)");
   ctx.fillStyle = sunGlow;
   ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * 3.2, 0, Math.PI * 2);
+  ctx.arc(sunX, sunY, sunR * 3.6, 0, Math.PI * 2);
   ctx.fill();
+
+  // Disk — deep ember core, blood rim
   const sunDisk = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
-  sunDisk.addColorStop(0, "#fff6d8");
-  sunDisk.addColorStop(0.45, "#ffb070");
-  sunDisk.addColorStop(1, "#ff6ea8");
+  sunDisk.addColorStop(0, "#ffe0a8");
+  sunDisk.addColorStop(0.35, "#ff8a4a");
+  sunDisk.addColorStop(0.7, "#e04560");
+  sunDisk.addColorStop(1, "#6a1840");
   ctx.fillStyle = sunDisk;
   ctx.beginPath();
   ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
   ctx.fill();
+  // Soft dark limb so it reads heavy against the wake
+  ctx.strokeStyle = `rgba(40, 8, 28, ${0.35 + bass * 0.15})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR * 0.98, 0, Math.PI * 2);
+  ctx.stroke();
 
   // Horizon haze along the road / building feet
   const haze = ctx.createLinearGradient(0, groundY - 18, 0, groundY + 8);
