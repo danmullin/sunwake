@@ -38,7 +38,7 @@ let skylineKickBob = 0;
 /** Continuous side-scroll pixels for Skyline (driven by levels + gridDrive). */
 let skylineScrollPx = 0;
 /** Smoothed scroll rate — avoids bass spikes hitching the strip. */
-let skylineDriveSmooth = 0.8;
+let skylineDriveSmooth = 1.6;
 /** Lit window flocks — Skyline's answer to Night Drive grid cells. */
 const skylineWinLits = [];
 const SKYLINE_WIN_MAX = 220;
@@ -4303,12 +4303,12 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   // Soft kick bob only — EQ owns the big vertical motion
   skylineKickBob = smooth(skylineKickBob, bass * 5 + snare * 2, 0.22);
   const bob = skylineKickBob;
-  // Smooth drive — raw bass was hitching scroll every kick
-  const driveTarget = 0.7 + FX.gridDrive * 1.6 + bass * 0.9 + mid * 0.45;
-  skylineDriveSmooth = smooth(skylineDriveSmooth, driveTarget, 0.1);
+  // Higher base cruise + music push — highway should feel fast
+  const driveTarget = 1.55 + FX.gridDrive * 2.4 + bass * 1.35 + mid * 0.65 + peak * 0.45;
+  skylineDriveSmooth = smooth(skylineDriveSmooth, driveTarget, 0.12);
   const dt = Math.min(33, PERF.emaDt || 16.7);
   // Continuous px scroll only — do NOT add FX.gridScroll (it wraps 0→1 and jumps)
-  skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * 2.8;
+  skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * 5.4;
   const scroll = skylineScrollPx;
 
   // Sky down to the road line
@@ -4319,12 +4319,12 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, groundY + 2);
 
-  // Sparse stars (slow drift, seamless across W)
+  // Sparse stars (slow drift vs city — depth cue for speed)
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const nStars = 48;
   for (let i = 0; i < nStars; i++) {
-    const sx = ((i * 97 + scroll * 0.04) % W + W) % W;
+    const sx = ((i * 97 + scroll * 0.07) % W + W) % W;
     const sy = ((i * 53) % Math.max(1, groundY * 0.55));
     const a = 0.15 + air * 0.45 * (0.5 + 0.5 * Math.sin(now * 0.0015 + i));
     ctx.fillStyle = `rgba(200, 230, 255, ${a})`;
@@ -4361,10 +4361,10 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = haze;
   ctx.fillRect(0, groundY - 18, W, 28);
 
-  // Buildings after sun so they clip the lower disc (peek effect)
-  drawSkylineLayer(skylineFar, scroll * 0.22, groundY, bob * 0.25, 0.55, false, bass, mid, air, peak, snare, now, "far");
-  drawSkylineLayer(skylineMid, scroll * 0.5, groundY, bob * 0.45, 0.72, true, bass, mid, air, peak, snare, now, "mid");
-  drawSkylineLayer(skylineNear, scroll * 0.88, groundY, bob * 0.7, 0.92, true, bass, mid, air, peak, snare, now, "near");
+  // Stronger parallax — near layer screams past, far stays deep
+  drawSkylineLayer(skylineFar, scroll * 0.14, groundY, bob * 0.25, 0.55, false, bass, mid, air, peak, snare, now, "far");
+  drawSkylineLayer(skylineMid, scroll * 0.48, groundY, bob * 0.45, 0.72, true, bass, mid, air, peak, snare, now, "mid");
+  drawSkylineLayer(skylineNear, scroll * 1.15, groundY, bob * 0.7, 0.92, true, bass, mid, air, peak, snare, now, "near");
 
   // Highway band
   const roadH = H - roadTop;
@@ -4381,13 +4381,13 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = `rgba(255, 110, 168, ${0.05 + mid * 0.07})`;
   ctx.fillRect(0, roadTop + 3, W, 2);
 
-  // Lane dashes — period matches dash+gap so wrap is invisible
+  // Lane dashes — shorter + faster so the road feels like it's flying under you
   const laneY = roadTop + roadH * 0.42;
-  const dashW = 36;
-  const gap = 28;
+  const dashW = 22;
+  const gap = 34;
   const period = dashW + gap;
-  const dashOff = ((scroll * 1.15) % period + period) % period;
-  ctx.strokeStyle = `rgba(240, 197, 106, ${0.45 + peak * 0.35})`;
+  const dashOff = ((scroll * 2.85) % period + period) % period;
+  ctx.strokeStyle = `rgba(240, 197, 106, ${0.5 + peak * 0.4})`;
   ctx.lineWidth = 3;
   ctx.setLineDash([dashW, gap]);
   // Positive offset = dashes travel left with the skyline (path is L→R)
@@ -4416,19 +4416,20 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
     ctx.fillRect(0, roadTop, W, roadH * 0.5);
   }
 
-  // Speed streaks on peak
-  if (peak > 0.2 || FX.gridDrive > 0.4) {
+  // Motion streaks — always on while driving; music makes them denser / longer
+  {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const streaksN = 6 + Math.floor(peak * 10);
+    const speedFeel = 0.35 + Math.min(1, skylineDriveSmooth / 4);
+    const streaksN = 10 + Math.floor(peak * 14 + mid * 6);
     for (let i = 0; i < streaksN; i++) {
-      const y = roadTop + 8 + ((i * 37 + now * 0.02) % (roadH * 0.7));
-      const len = 40 + peak * 80 + mid * 40;
+      const y = roadTop + 6 + ((i * 37 + now * 0.05) % (roadH * 0.75));
+      const len = 70 + peak * 120 + mid * 50 + speedFeel * 40;
       const streakPeriod = W + len;
       const x =
-        ((((i * 113 - scroll * 2.2) % streakPeriod) + streakPeriod) % streakPeriod) - len;
-      ctx.strokeStyle = `rgba(69, 224, 255, ${0.08 + peak * 0.2})`;
-      ctx.lineWidth = 1.5;
+        ((((i * 113 - scroll * 4.6) % streakPeriod) + streakPeriod) % streakPeriod) - len;
+      ctx.strokeStyle = `rgba(69, 224, 255, ${0.06 + peak * 0.22 + speedFeel * 0.06})`;
+      ctx.lineWidth = 1.25 + peak;
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + len, y);
