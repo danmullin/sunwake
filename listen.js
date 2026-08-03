@@ -4699,6 +4699,185 @@ function drawSkylineLayer(buildings, scroll, groundY, alpha, drawWindows, bass, 
 }
 
 /**
+ * Ominous Skyline sun — wake, rays, kick rings, flare, music-reactive corona.
+ */
+function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
+  const pulse = fxOn("sunPulse");
+  const sunX = W * 0.22;
+  const beat = pulse ? bass * 0.1 + peak * 0.06 + snare * 0.04 : 0;
+  const sunR = Math.min(W, H) * (0.11 + beat) * SUN_SCALE * 0.9;
+  const sunY = tallRoofY + sunR * 0.45;
+  const breath = 0.5 + 0.5 * Math.sin(now * 0.0012);
+  const heat = Math.min(1, bass * 0.85 + peak * 0.55 + solo * 0.35);
+
+  // Sky cast — sun bruises the atmosphere toward the city
+  ctx.save();
+  const cast = ctx.createRadialGradient(sunX, sunY, sunR * 0.5, sunX, sunY, Math.max(W, H) * 0.75);
+  cast.addColorStop(0, `rgba(180, 40, 55, ${0.08 + heat * 0.12})`);
+  cast.addColorStop(0.35, `rgba(90, 20, 50, ${0.05 + mid * 0.06})`);
+  cast.addColorStop(1, "rgba(10, 8, 20, 0)");
+  ctx.fillStyle = cast;
+  ctx.fillRect(0, 0, W, tallRoofY + sunR * 4);
+  ctx.restore();
+
+  // Cloud wake — streams off the LEFT so the sun feels like it's following us
+  ctx.save();
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const drift = Math.sin(now * 0.00035 + i * 0.9) * sunR * 0.22;
+    const wx = sunX - sunR * (0.35 + t * 5.8);
+    const wy = sunY + drift + (i - 3) * sunR * 0.2;
+    const ww = sunR * (2.6 + t * 6 + heat * 0.8);
+    const wh = sunR * (0.5 + (1 - t) * 0.6);
+    const wake = ctx.createRadialGradient(wx, wy, 0, wx, wy, ww);
+    const a0 = (0.18 - t * 0.02) * (0.7 + mid * 0.3 + heat * 0.15);
+    wake.addColorStop(0, `rgba(28, 12, 36, ${a0})`);
+    wake.addColorStop(0.35, `rgba(70, 22, 48, ${a0 * 0.55})`);
+    wake.addColorStop(0.7, `rgba(40, 18, 55, ${a0 * 0.22})`);
+    wake.addColorStop(1, "rgba(10, 8, 20, 0)");
+    ctx.fillStyle = wake;
+    ctx.beginPath();
+    ctx.ellipse(wx, wy, ww, wh, 0.06 - i * 0.015, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < 3; i++) {
+    const t = i / 3;
+    const lx = sunX - sunR * (0.85 + t * 1.8);
+    const ly = sunY + Math.sin(now * 0.0005 + i) * sunR * 0.12;
+    const lip = ctx.createRadialGradient(lx, ly, 0, lx, ly, sunR * (1.2 + t));
+    lip.addColorStop(0, `rgba(255, 90, 110, ${(0.08 + heat * 0.06) - t * 0.02})`);
+    lip.addColorStop(0.5, `rgba(180, 60, 100, ${0.045 - t * 0.01})`);
+    lip.addColorStop(1, "rgba(80, 30, 60, 0)");
+    ctx.fillStyle = lip;
+    ctx.beginPath();
+    ctx.ellipse(lx, ly, sunR * (1.4 + t * 1.2), sunR * 0.35, 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Long god-rays — slow spin, thicken on bass
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const rayN = 10;
+  const spin = now * 0.00008 + bass * 0.15;
+  for (let i = 0; i < rayN; i++) {
+    const ang = spin + (i / rayN) * Math.PI * 2;
+    const flicker = 0.55 + 0.45 * Math.sin(now * 0.002 + i * 1.7);
+    const len = sunR * (3.5 + heat * 2.5 + breath * 0.8) * (0.7 + (i % 3) * 0.2);
+    const half = (0.035 + bass * 0.04 + peak * 0.02) * flicker;
+    const a = (0.03 + heat * 0.07) * flicker;
+    ctx.fillStyle =
+      i % 2 === 0 ? `rgba(255, 120, 80, ${a})` : `rgba(255, 70, 110, ${a * 0.85})`;
+    ctx.beginPath();
+    ctx.moveTo(sunX, sunY);
+    ctx.lineTo(sunX + Math.cos(ang - half) * len, sunY + Math.sin(ang - half) * len);
+    ctx.lineTo(sunX + Math.cos(ang + half) * len, sunY + Math.sin(ang + half) * len);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Kick / peak shock rings
+  if (bass > 0.28 || peak > 0.22 || snare > 0.35) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const rings = 2 + (peak > 0.4 ? 1 : 0);
+    for (let i = 0; i < rings; i++) {
+      const phase = (now * 0.003 + i * 0.45) % 1;
+      const rr = sunR * (1.15 + phase * (2.8 + bass * 1.5));
+      const ra = (1 - phase) * (0.18 + bass * 0.22 + snare * 0.12);
+      ctx.strokeStyle = i % 2 ? `rgba(255, 110, 168, ${ra})` : `rgba(255, 160, 90, ${ra})`;
+      ctx.lineWidth = 1.5 + (1 - phase) * 2.5;
+      ctx.beginPath();
+      ctx.arc(sunX, sunY, rr, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Anamorphic flare streak on hits
+  if (peak > 0.18 || snare > 0.3 || bass > 0.4) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const fa = 0.08 + peak * 0.22 + snare * 0.12 + bass * 0.08;
+    const flare = ctx.createLinearGradient(sunX - sunR * 6, sunY, sunX + sunR * 5, sunY);
+    flare.addColorStop(0, "rgba(255, 100, 80, 0)");
+    flare.addColorStop(0.45, `rgba(255, 180, 120, ${fa * 0.55})`);
+    flare.addColorStop(0.5, `rgba(255, 240, 200, ${fa})`);
+    flare.addColorStop(0.55, `rgba(255, 110, 160, ${fa * 0.5})`);
+    flare.addColorStop(1, "rgba(120, 40, 80, 0)");
+    ctx.fillStyle = flare;
+    ctx.fillRect(sunX - sunR * 6, sunY - 1.5 - peak * 2, sunR * 11, 3 + peak * 4);
+    ctx.restore();
+  }
+
+  // Bruised corona
+  const glowR = sunR * (3.8 + heat * 1.2);
+  const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, glowR);
+  sunGlow.addColorStop(0, `rgba(255, 160, 90, ${0.32 + heat * 0.28})`);
+  sunGlow.addColorStop(0.22, `rgba(220, 55, 75, ${0.22 + mid * 0.14})`);
+  sunGlow.addColorStop(0.5, `rgba(100, 25, 70, ${0.14 + solo * 0.1})`);
+  sunGlow.addColorStop(1, "rgba(20, 10, 30, 0)");
+  ctx.fillStyle = sunGlow;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, glowR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner halo ring
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = `rgba(255, 140, 100, ${0.12 + heat * 0.2 + breath * 0.06})`;
+  ctx.lineWidth = 2 + bass * 3;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR * (1.25 + bass * 0.15), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = `rgba(255, 80, 130, ${0.08 + snare * 0.15})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR * (1.55 + peak * 0.2), 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Disk — deep ember core, blood rim; core brightens on kick
+  const coreBoost = 0.15 + bass * 0.35 + peak * 0.2;
+  const sunDisk = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+  sunDisk.addColorStop(0, `rgb(${255}, ${224 + coreBoost * 30}, ${168 + coreBoost * 40})`);
+  sunDisk.addColorStop(0.3, "#ff8a4a");
+  sunDisk.addColorStop(0.65, "#e04560");
+  sunDisk.addColorStop(1, "#6a1840");
+  ctx.fillStyle = sunDisk;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hot speckles on the face (subtle turbulence)
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR * 0.92, 0, Math.PI * 2);
+  ctx.clip();
+  for (let i = 0; i < 14; i++) {
+    const a = now * 0.0007 + i * 2.3;
+    const pr = sunR * (0.15 + (i % 5) * 0.12);
+    const px = sunX + Math.cos(a + i) * pr * (0.4 + 0.5 * Math.sin(now * 0.001 + i));
+    const py = sunY + Math.sin(a * 1.3 + i) * pr * 0.55;
+    ctx.fillStyle = `rgba(255, 220, 160, ${0.04 + heat * 0.06})`;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.5 + (i % 3), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Dark limb
+  ctx.strokeStyle = `rgba(40, 8, 28, ${0.4 + bass * 0.2})`;
+  ctx.lineWidth = 2 + heat;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR * 0.98, 0, Math.PI * 2);
+  ctx.stroke();
+}
+
+/**
  * Classic side-view highway + skyline strip — flat parallax, no vanish grid.
  */
 function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
@@ -4740,75 +4919,8 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   }
   ctx.restore();
 
-  // Sun behind skyline — ominous disk with a cloud wake trailing through the haze
-  const sunX = W * 0.22;
-  const sunR = Math.min(W, H) * (0.1 + (fxOn("sunPulse") ? bass * 0.05 : 0)) * SUN_SCALE * 0.85;
-  const sunY = tallRoofY + sunR * 0.45;
-
-  // Cloud wake — streams off the LEFT so the sun feels like it's following us
-  ctx.save();
-  for (let i = 0; i < 6; i++) {
-    const t = i / 5;
-    const drift = Math.sin(now * 0.00035 + i * 0.9) * sunR * 0.2;
-    const wx = sunX - sunR * (0.4 + t * 5.2);
-    const wy = sunY + drift + (i - 2.5) * sunR * 0.18;
-    const ww = sunR * (2.4 + t * 5.5);
-    const wh = sunR * (0.45 + (1 - t) * 0.55);
-    const wake = ctx.createRadialGradient(wx, wy, 0, wx, wy, ww);
-    const a0 = (0.16 - t * 0.02) * (0.75 + mid * 0.25);
-    wake.addColorStop(0, `rgba(28, 12, 36, ${a0})`);
-    wake.addColorStop(0.35, `rgba(70, 22, 48, ${a0 * 0.55})`);
-    wake.addColorStop(0.7, `rgba(40, 18, 55, ${a0 * 0.22})`);
-    wake.addColorStop(1, "rgba(10, 8, 20, 0)");
-    ctx.fillStyle = wake;
-    ctx.beginPath();
-    ctx.ellipse(wx, wy, ww, wh, 0.06 - i * 0.015, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Lit lip — sun catching the near edge of the wake (just left of the disk)
-  ctx.globalCompositeOperation = "lighter";
-  for (let i = 0; i < 3; i++) {
-    const t = i / 3;
-    const lx = sunX - sunR * (0.85 + t * 1.8);
-    const ly = sunY + Math.sin(now * 0.0005 + i) * sunR * 0.12;
-    const lip = ctx.createRadialGradient(lx, ly, 0, lx, ly, sunR * (1.2 + t));
-    lip.addColorStop(0, `rgba(255, 90, 110, ${0.07 - t * 0.02})`);
-    lip.addColorStop(0.5, `rgba(180, 60, 100, ${0.04 - t * 0.01})`);
-    lip.addColorStop(1, "rgba(80, 30, 60, 0)");
-    ctx.fillStyle = lip;
-    ctx.beginPath();
-    ctx.ellipse(lx, ly, sunR * (1.4 + t * 1.2), sunR * 0.35, 0.1, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-
-  // Bruised corona — wider, darker, less cheerful than a clean synth sun
-  const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3.6);
-  sunGlow.addColorStop(0, `rgba(255, 140, 80, ${0.28 + bass * 0.2})`);
-  sunGlow.addColorStop(0.25, `rgba(200, 50, 70, ${0.2 + mid * 0.12})`);
-  sunGlow.addColorStop(0.55, `rgba(90, 30, 70, ${0.12 + solo * 0.08})`);
-  sunGlow.addColorStop(1, "rgba(20, 10, 30, 0)");
-  ctx.fillStyle = sunGlow;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * 3.6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Disk — deep ember core, blood rim
-  const sunDisk = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
-  sunDisk.addColorStop(0, "#ffe0a8");
-  sunDisk.addColorStop(0.35, "#ff8a4a");
-  sunDisk.addColorStop(0.7, "#e04560");
-  sunDisk.addColorStop(1, "#6a1840");
-  ctx.fillStyle = sunDisk;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
-  ctx.fill();
-  // Soft dark limb so it reads heavy against the wake
-  ctx.strokeStyle = `rgba(40, 8, 28, ${0.35 + bass * 0.15})`;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * 0.98, 0, Math.PI * 2);
-  ctx.stroke();
+  // Sun behind skyline — ominous, music-reactive presence
+  drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY);
 
   // Horizon haze along the road / building feet
   const haze = ctx.createLinearGradient(0, groundY - 18, 0, groundY + 8);
