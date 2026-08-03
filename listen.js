@@ -5941,7 +5941,7 @@ filePick.addEventListener("click", (e) => e.stopPropagation());
 document.querySelectorAll("[data-viz]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const mode = btn.getAttribute("data-viz");
-    if (mode === "skyline" || mode === "nightDrive" || mode === "rainDrive") setVizMode(mode);
+    if (VIZ_MODES.includes(mode)) setVizMode(mode);
   });
 });
 vizSwitchBtn?.addEventListener("click", () => {
