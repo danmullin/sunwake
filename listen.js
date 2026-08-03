@@ -4021,50 +4021,99 @@ function skylinePickPalette(seed) {
 }
 
 /**
- * Recursive setbacks / twin towers / spires — unique silhouette per seed.
+ * Connected silhouette only — stacked setbacks + optional spire.
+ * No twin-tower gaps or floating masses; every slab shares an edge with the one below.
  * Masses use u,v in building space: v=0 roof, v=1 street.
  */
 function skylineFractalMasses(seed, maxDepth) {
   const masses = [];
-  const split = (u0, u1, v0, v1, depth, s) => {
-    const bw = u1 - u0;
-    const bh = v1 - v0;
-    if (depth <= 0 || bh < 0.14 || bw < 0.16) {
-      masses.push({ u0, u1, v0, v1, shade: skylineRand(s) });
-      return;
+  const nTiers = Math.max(
+    1,
+    Math.min(3, (maxDepth | 0) + (skylineRand(seed) > 0.55 ? 1 : 0)),
+  );
+
+  // Horizontal splits from roof (0) → street (1)
+  const edges = [0];
+  for (let i = 1; i < nTiers; i++) {
+    const t = i / nTiers;
+    const jitter = (skylineRand(seed + i * 1.7) - 0.5) * 0.14;
+    edges.push(Math.min(0.9, Math.max(0.1, t + jitter)));
+  }
+  edges.push(1);
+  edges.sort((a, b) => a - b);
+  // Dedupe near-collisions so slabs stay chunky
+  for (let i = 1; i < edges.length; i++) {
+    if (edges[i] - edges[i - 1] < 0.1) {
+      edges[i] = Math.min(1, edges[i - 1] + 0.1);
     }
-    const r = skylineRand(s);
-    if (r < 0.38) {
-      // Horizontal setback — upper tier narrower
-      const mid = v0 + bh * (0.28 + skylineRand(s + 1) * 0.38);
-      const inset = 0.06 + skylineRand(s + 2) * 0.22;
-      split(u0, u1, mid, v1, depth - 1, s + 3);
-      split(u0 + inset * bw, u1 - inset * bw, v0, mid, depth - 1, s + 7);
-    } else if (r < 0.68) {
-      // Twin / offset towers
-      const gap = 0.04 + skylineRand(s + 1) * 0.12;
-      const midU = u0 + bw * (0.42 + skylineRand(s + 2) * 0.16);
-      const lift = bh * skylineRand(s + 3) * 0.28;
-      split(u0, midU - gap * bw * 0.5, v0 + lift, v1, depth - 1, s + 11);
-      split(midU + gap * bw * 0.5, u1, v0, v1, depth - 1, s + 17);
-    } else {
-      masses.push({ u0, u1, v0, v1, shade: skylineRand(s + 4) });
-      // Spire / antenna
-      if (skylineRand(s + 5) > 0.4) {
-        const cx = (u0 + u1) * 0.5;
-        const sw = bw * (0.06 + skylineRand(s + 6) * 0.14);
-        masses.push({
-          u0: cx - sw,
-          u1: cx + sw,
-          v0: Math.max(0, v0 - (0.08 + skylineRand(s + 7) * 0.14)),
-          v1: v0,
-          shade: 0.9,
-          spire: true,
-        });
+  }
+  if (edges[edges.length - 1] < 1) edges[edges.length - 1] = 1;
+
+  // Build ground → roof: each upper tier is inset and sits on the tier below
+  let u0 = 0;
+  let u1 = 1;
+  for (let i = edges.length - 2; i >= 0; i--) {
+    const v0 = edges[i];
+    const v1 = edges[i + 1];
+    if (v1 - v0 < 0.06 || u1 - u0 < 0.08) continue;
+    const parentU0 = u0;
+    const parentU1 = u1;
+    masses.push({
+      u0,
+      u1,
+      v0,
+      v1,
+      shade: skylineRand(seed + i * 2.3),
+    });
+    // Prepare inset footprint for the next tier up (lower v)
+    if (i > 0) {
+      const bw = parentU1 - parentU0;
+      const inset = 0.07 + skylineRand(seed + i + 11) * 0.2;
+      let nu0 = parentU0 + inset * bw;
+      let nu1 = parentU1 - inset * bw;
+      const shift = (skylineRand(seed + i + 21) - 0.5) * inset * bw * 0.7;
+      nu0 += shift;
+      nu1 += shift;
+      // Stay strictly inside parent so the stack never disconnects
+      if (nu0 < parentU0) {
+        nu1 += parentU0 - nu0;
+        nu0 = parentU0;
       }
+      if (nu1 > parentU1) {
+        nu0 -= nu1 - parentU1;
+        nu1 = parentU1;
+      }
+      if (nu1 - nu0 < 0.12) {
+        const cx = (parentU0 + parentU1) * 0.5;
+        nu0 = cx - 0.06;
+        nu1 = cx + 0.06;
+        nu0 = Math.max(parentU0, nu0);
+        nu1 = Math.min(parentU1, nu1);
+      }
+      u0 = nu0;
+      u1 = nu1;
     }
-  };
-  split(0, 1, 0, 1, maxDepth, seed * 19.7 + 3.1);
+  }
+
+  // Spire only on the roof tier, centered and touching its top edge
+  const roof = masses[masses.length - 1];
+  if (roof && !roof.spire && skylineRand(seed + 50) > 0.42) {
+    const cx = (roof.u0 + roof.u1) * 0.5;
+    const sw = Math.max(0.03, (roof.u1 - roof.u0) * (0.05 + skylineRand(seed + 51) * 0.1));
+    masses.push({
+      u0: cx - sw,
+      u1: cx + sw,
+      v0: Math.max(0, roof.v0 - (0.05 + skylineRand(seed + 52) * 0.1)),
+      v1: roof.v0,
+      shade: 0.9,
+      spire: true,
+    });
+  }
+
+  // Safety: if somehow empty, one solid block
+  if (!masses.length) {
+    masses.push({ u0: 0, u1: 1, v0: 0, v1: 1, shade: 0.5 });
+  }
   return masses;
 }
 
@@ -4426,8 +4475,17 @@ function drawSkylineLayer(buildings, scroll, groundY, alpha, drawWindows, bass, 
         const winH = Math.max(2, (bh / (b.rows || 4)) * 0.45);
         ctx.globalCompositeOperation = "lighter";
 
-        // Ambient grid — band by floor + each building's color DNA
+        // Ambient grid — only on solid mass (no floating windows in setback air)
         for (const win of b.windows) {
+          let inMass = !masses.length;
+          for (const m of masses) {
+            if (m.spire) continue;
+            if (win.u >= m.u0 && win.u <= m.u1 && win.v >= m.v0 && win.v <= m.v1) {
+              inMass = true;
+              break;
+            }
+          }
+          if (!inMass) continue;
           const band =
             win.band === "bass"
               ? bass * 1.15 + peak * 0.35
