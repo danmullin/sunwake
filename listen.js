@@ -4010,10 +4010,12 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, m
     for (let k = -1; k <= 1; k++) {
       const x = b.x - off + k * loopW;
       if (x + b.w < -4 || x > W + 4) continue;
+      // Bob lifts the roof only — base stays planted on groundY
       const top = groundY - b.h - bob * (0.35 + b.hue * 0.4);
+      const bh = Math.max(2, groundY - top);
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = `rgba(${12 + b.hue * 18}, ${8 + b.hue * 10}, ${28 + b.hue * 40}, ${alpha})`;
-      ctx.fillRect(x, top, b.w, b.h + bob * 0.2);
+      ctx.fillRect(x, top, b.w, bh);
       ctx.fillStyle = `rgba(255, 110, 168, ${0.08 + air * 0.12})`;
       ctx.fillRect(x, top, b.w, 2);
       if (drawWindows && b.windows) {
@@ -4025,9 +4027,9 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, m
           const a = (0.15 + air * 0.55 + mid * 0.25) * tw;
           if (a < 0.08) continue;
           const wx = x + win.u * b.w;
-          const wy = top + win.v * b.h;
+          const wy = top + win.v * bh;
           ctx.fillStyle = `rgba(255, 210, 140, ${a})`;
-          ctx.fillRect(wx, wy, Math.max(2, b.w * 0.08), Math.max(2, b.h * 0.06));
+          ctx.fillRect(wx, wy, Math.max(2, b.w * 0.08), Math.max(2, bh * 0.06));
         }
       }
     }
@@ -4040,7 +4042,10 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, m
  */
 function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   const roadTop = H * 0.62;
-  const horizonY = roadTop - H * 0.02;
+  // Buildings plant flush on the highway shoulder (no floating gap)
+  const groundY = roadTop;
+  // Tallest near-layer roofs (~0.42H) — sun peeks over, not fully above
+  const tallRoofY = groundY - H * 0.42;
   skylineKickBob = smooth(skylineKickBob, bass * 10 + snare * 4, 0.22);
   const bob = skylineKickBob;
   // Smooth drive — raw bass was hitching scroll every kick
@@ -4051,13 +4056,13 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * 2.8;
   const scroll = skylineScrollPx;
 
-  // Sky
-  const g = ctx.createLinearGradient(0, 0, 0, horizonY);
+  // Sky down to the road line
+  const g = ctx.createLinearGradient(0, 0, 0, groundY);
   g.addColorStop(0, "#04070f");
   g.addColorStop(0.55, `rgb(${10 + bass * 20}, ${12 + mid * 16}, ${32 + bass * 28})`);
   g.addColorStop(1, "#0a1524");
   ctx.fillStyle = g;
-  ctx.fillRect(0, 0, W, horizonY + 2);
+  ctx.fillRect(0, 0, W, groundY + 2);
 
   // Sparse stars (slow drift, seamless across W)
   ctx.save();
@@ -4065,17 +4070,17 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   const nStars = 48;
   for (let i = 0; i < nStars; i++) {
     const sx = ((i * 97 + scroll * 0.04) % W + W) % W;
-    const sy = ((i * 53) % Math.max(1, horizonY * 0.72));
+    const sy = ((i * 53) % Math.max(1, groundY * 0.55));
     const a = 0.15 + air * 0.45 * (0.5 + 0.5 * Math.sin(now * 0.0015 + i));
     ctx.fillStyle = `rgba(200, 230, 255, ${a})`;
     ctx.fillRect(sx, sy, 1.5, 1.5);
   }
   ctx.restore();
 
-  // Sun — left-back on the horizon
+  // Sun behind skyline — center near tall roofs so it peeks over, not clears them
   const sunX = W * 0.22;
-  const sunY = horizonY - H * 0.02;
   const sunR = Math.min(W, H) * (0.1 + (fxOn("sunPulse") ? bass * 0.05 : 0)) * SUN_SCALE * 0.85;
+  const sunY = tallRoofY + sunR * 0.45;
   const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3.2);
   sunGlow.addColorStop(0, `rgba(255, 200, 120, ${0.35 + bass * 0.25})`);
   sunGlow.addColorStop(0.35, `rgba(255, 110, 168, ${0.18 + mid * 0.15})`);
@@ -4093,17 +4098,18 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Horizon haze line
-  const haze = ctx.createLinearGradient(0, horizonY - 18, 0, horizonY + 8);
+  // Horizon haze along the road / building feet
+  const haze = ctx.createLinearGradient(0, groundY - 18, 0, groundY + 8);
   haze.addColorStop(0, "rgba(69, 224, 255, 0)");
   haze.addColorStop(0.6, `rgba(255, 110, 168, ${0.15 + solo * 0.2})`);
   haze.addColorStop(1, "rgba(69, 224, 255, 0)");
   ctx.fillStyle = haze;
-  ctx.fillRect(0, horizonY - 18, W, 28);
+  ctx.fillRect(0, groundY - 18, W, 28);
 
-  drawSkylineLayer(skylineFar, scroll * 0.22, horizonY, bob * 0.25, 0.55, false, mid, air, now);
-  drawSkylineLayer(skylineMid, scroll * 0.5, horizonY, bob * 0.45, 0.72, true, mid, air, now);
-  drawSkylineLayer(skylineNear, scroll * 0.88, horizonY, bob * 0.7, 0.92, true, mid, air, now);
+  // Buildings after sun so they clip the lower disc (peek effect)
+  drawSkylineLayer(skylineFar, scroll * 0.22, groundY, bob * 0.25, 0.55, false, mid, air, now);
+  drawSkylineLayer(skylineMid, scroll * 0.5, groundY, bob * 0.45, 0.72, true, mid, air, now);
+  drawSkylineLayer(skylineNear, scroll * 0.88, groundY, bob * 0.7, 0.92, true, mid, air, now);
 
   // Highway band
   const roadH = H - roadTop;
