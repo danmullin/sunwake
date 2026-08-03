@@ -49,10 +49,16 @@ body {
   pointer-events: none;
   text-shadow: 0 0 28px rgba(69, 224, 255, 0.35);
   transition:
-    opacity 0.35s ease,
-    visibility 0.35s ease,
+    opacity 0.45s ease,
+    visibility 0.45s ease,
     text-shadow 0.6s ease,
     filter 0.6s ease;
+}
+
+/* Arcade marquee owns the title — fade the HUD brand out */
+#stage.cabinet-title .brand {
+  opacity: 0;
+  visibility: hidden;
 }
 
 /* System-audio live polish (no personal chrome) */
@@ -458,8 +464,8 @@ body {
 .brand,
 .chrome {
   transition:
-    opacity 0.35s ease,
-    visibility 0.35s ease,
+    opacity 0.45s ease,
+    visibility 0.45s ease,
     text-shadow 0.6s ease,
     filter 0.6s ease;
 }

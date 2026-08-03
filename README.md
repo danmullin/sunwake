@@ -27,6 +27,10 @@ Open http://127.0.0.1:8765/
 
 Or open `index.html` via any static file server (modules need HTTP, not `file://`).
 
+## Code layout
+
+Entry is thin [`listen.js`](listen.js) → [`lib/app.js`](lib/app.js) (`SunwakeApp`). Services and scenes live under [`lib/`](lib/); the migrated engine is [`lib/runtime.js`](lib/runtime.js). Native ES modules — no bundler.
+
 ## Listen
 
 1. Choose a scene on the gate (**Night Drive**, **Rain Drive**, **Tunnel**, **Arcade**, or **Skyline**)

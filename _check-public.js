@@ -8,6 +8,20 @@ const path = require("path");
 const root = __dirname;
 const files = ["index.html", "listen.js", "listen.css", "README.md"];
 
+const libDir = path.join(root, "lib");
+function listJs(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const name of fs.readdirSync(dir)) {
+    const full = path.join(dir, name);
+    const st = fs.statSync(full);
+    if (st.isDirectory()) out.push(...listJs(full));
+    else if (name.endsWith(".js")) out.push(path.relative(root, full).replace(/\\/g, "/"));
+  }
+  return out;
+}
+files.push(...listJs(libDir));
+
 /** Strings that must never appear on the public site */
 const FORBIDDEN = [
   "Mist —",
@@ -32,6 +46,8 @@ const FORBIDDEN = [
 const REQUIRED = [
   { file: "index.html", needle: "<title>Sunwake</title>" },
   { file: "index.html", needle: "<h1>SUNWAKE</h1>" },
+  { file: "listen.js", needle: "SunwakeApp" },
+  { file: "lib/app.js", needle: "class SunwakeApp" },
 ];
 
 let failed = false;
