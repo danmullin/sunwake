@@ -4793,68 +4793,78 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     ctx.restore();
   }
 
-  // Bruised corona
-  const glowR = sunR * (3.8 + heat * 1.2);
-  const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, glowR);
-  sunGlow.addColorStop(0, `rgba(255, 160, 90, ${0.32 + heat * 0.28})`);
-  sunGlow.addColorStop(0.22, `rgba(220, 55, 75, ${0.22 + mid * 0.14})`);
-  sunGlow.addColorStop(0.5, `rgba(100, 25, 70, ${0.14 + solo * 0.1})`);
-  sunGlow.addColorStop(1, "rgba(20, 10, 30, 0)");
-  ctx.fillStyle = sunGlow;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, glowR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Soft gold halo — quiet breath, not pulsing shock rings
+  // Diffused body — layered soft glows, no hard yolk edge
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = `rgba(255, 140, 100, ${0.1 + heat * 0.14 + breath * 0.05})`;
-  ctx.lineWidth = 1.5 + bass * 1.5;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * (1.2 + bass * 0.08), 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
 
-  // Disk — deep ember core, blood rim; core brightens on kick
+  // Wide atmospheric bloom
+  const bloomR = sunR * (5.2 + heat * 1.6);
+  const bloom = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, bloomR);
+  bloom.addColorStop(0, `rgba(255, 170, 110, ${0.22 + heat * 0.2})`);
+  bloom.addColorStop(0.2, `rgba(230, 80, 90, ${0.14 + mid * 0.1})`);
+  bloom.addColorStop(0.45, `rgba(120, 40, 80, ${0.08 + solo * 0.06})`);
+  bloom.addColorStop(1, "rgba(30, 12, 28, 0)");
+  ctx.fillStyle = bloom;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, bloomR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mid haze shell
+  const hazeR = sunR * (2.4 + heat * 0.5);
+  const hazeG = ctx.createRadialGradient(sunX, sunY, sunR * 0.15, sunX, sunY, hazeR);
+  hazeG.addColorStop(0, `rgba(255, 200, 140, ${0.35 + heat * 0.25})`);
+  hazeG.addColorStop(0.35, `rgba(255, 120, 90, ${0.22 + bass * 0.12})`);
+  hazeG.addColorStop(0.7, `rgba(200, 60, 90, ${0.1})`);
+  hazeG.addColorStop(1, "rgba(80, 20, 50, 0)");
+  ctx.fillStyle = hazeG;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, hazeR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Soft core — feathered to transparent (not a solid disk)
   const coreBoost = 0.15 + bass * 0.35 + peak * 0.2;
-  const sunDisk = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
-  sunDisk.addColorStop(0, `rgb(${255}, ${224 + coreBoost * 30}, ${168 + coreBoost * 40})`);
-  sunDisk.addColorStop(0.3, "#ff8a4a");
-  sunDisk.addColorStop(0.65, "#e04560");
-  sunDisk.addColorStop(1, "#6a1840");
-  ctx.fillStyle = sunDisk;
+  const coreR = sunR * 1.35;
+  const core = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, coreR);
+  core.addColorStop(0, `rgba(255, ${230 + coreBoost * 20}, ${190 + coreBoost * 25}, ${0.85 + coreBoost * 0.1})`);
+  core.addColorStop(0.25, `rgba(255, 180, 100, ${0.55 + heat * 0.15})`);
+  core.addColorStop(0.5, `rgba(240, 90, 90, ${0.28 + heat * 0.1})`);
+  core.addColorStop(0.75, `rgba(180, 50, 80, ${0.1})`);
+  core.addColorStop(1, "rgba(80, 20, 40, 0)");
+  ctx.fillStyle = core;
   ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+  ctx.arc(sunX, sunY, coreR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Hot speckles on the face (subtle turbulence)
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  // Quiet outer breath ring (very soft)
+  ctx.strokeStyle = `rgba(255, 150, 110, ${0.06 + heat * 0.1 + breath * 0.04})`;
+  ctx.lineWidth = 6 + bass * 4;
   ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * 0.92, 0, Math.PI * 2);
-  ctx.clip();
-  for (let i = 0; i < 14; i++) {
+  ctx.arc(sunX, sunY, sunR * (1.55 + bass * 0.1), 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Soft face shimmer inside the glow (no hard clip)
+  for (let i = 0; i < 10; i++) {
     const a = now * 0.0007 + i * 2.3;
-    const pr = sunR * (0.15 + (i % 5) * 0.12);
-    const px = sunX + Math.cos(a + i) * pr * (0.4 + 0.5 * Math.sin(now * 0.001 + i));
-    const py = sunY + Math.sin(a * 1.3 + i) * pr * 0.55;
-    ctx.fillStyle = `rgba(255, 220, 160, ${0.04 + heat * 0.06})`;
+    const pr = sunR * (0.2 + (i % 4) * 0.1);
+    const px = sunX + Math.cos(a + i) * pr * (0.35 + 0.4 * Math.sin(now * 0.001 + i));
+    const py = sunY + Math.sin(a * 1.3 + i) * pr * 0.45;
+    ctx.fillStyle = `rgba(255, 230, 180, ${0.03 + heat * 0.04})`;
     ctx.beginPath();
-    ctx.arc(px, py, 1.5 + (i % 3), 0, Math.PI * 2);
+    ctx.arc(px, py, 2 + (i % 3), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  // Petals after the disk — wedges sit on top and blend the sun into the sky
+  // Petals after the glow — wedges sit on the diffused light
   if (fxOn("sunPetals")) {
     const energy = Math.max(0, solo * 0.9 + mid * 0.28 - 0.1);
     if (energy >= 0.05) {
-      const rInner = sunR * (0.95 + energy * 0.08);
-      const rOuter = sunR * (1.55 + energy * 1.35);
+      const rInner = sunR * (0.55 + energy * 0.15);
+      const rOuter = sunR * (1.85 + energy * 1.45);
       const petals = 8;
       const open = 0.32 + energy * 0.48;
       const rot = now * 0.00012 * (0.35 + energy) + solo * 0.55;
-      const alpha = Math.min(0.55, 0.1 + energy * 0.45);
+      const alpha = Math.min(0.5, 0.08 + energy * 0.4);
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       ctx.translate(sunX, sunY);
@@ -4870,22 +4880,17 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
         ctx.lineTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
         ctx.arc(0, 0, rInner, a1, a0, true);
         ctx.closePath();
-        const grad = ctx.createRadialGradient(0, 0, rInner * 0.4, 0, 0, rOuter);
-        grad.addColorStop(0, synthRainbow(hueT, alpha * 0.35));
-        grad.addColorStop(0.45, synthRainbow(hueT + 0.12, alpha * 0.7));
-        grad.addColorStop(0.82, synthRainbow(hueT + 0.22, alpha * 0.35));
+        const grad = ctx.createRadialGradient(0, 0, rInner * 0.2, 0, 0, rOuter);
+        grad.addColorStop(0, synthRainbow(hueT, alpha * 0.25));
+        grad.addColorStop(0.4, synthRainbow(hueT + 0.12, alpha * 0.55));
+        grad.addColorStop(0.8, synthRainbow(hueT + 0.22, alpha * 0.28));
         grad.addColorStop(1, synthRainbow(hueT + 0.3, 0));
         ctx.fillStyle = grad;
         ctx.fill();
-        ctx.strokeStyle = synthRainbow(hueT + 0.18, alpha * 0.45);
-        ctx.lineWidth = 1 + energy * 1.2;
+        ctx.strokeStyle = synthRainbow(hueT + 0.18, alpha * 0.3);
+        ctx.lineWidth = 1 + energy;
         ctx.stroke();
       }
-      ctx.beginPath();
-      ctx.arc(0, 0, rInner * (0.92 + energy * 0.08), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 220, 180, ${0.08 + energy * 0.2})`;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
       ctx.restore();
     }
   }
