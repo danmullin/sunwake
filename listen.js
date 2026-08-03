@@ -43,6 +43,9 @@ let skylineDriveSmooth = 0.8;
 const skylineWinLits = [];
 const SKYLINE_WIN_MAX = 220;
 const SKYLINE_WIN_STEP_MS = 95;
+/** Spectrum bars driving Skyline building heights (left=bass → right=air). */
+const SKYLINE_EQ_N = 56;
+const skylineEq = new Float32Array(SKYLINE_EQ_N);
 
 let W = 0;
 let H = 0;
@@ -3986,6 +3989,43 @@ function skylineWinFill(hue, a) {
   return `rgba(69, 224, 255, ${a})`;
 }
 
+/** Pull analyser bins into a smooth left→right EQ used as building heights. */
+function updateSkylineEq(now) {
+  const n = freq && freq.length ? freq.length : 0;
+  for (let i = 0; i < SKYLINE_EQ_N; i++) {
+    let target = 0.12 + 0.06 * Math.sin(now * 0.0011 + i * 0.35);
+    if (n > 8 && playing) {
+      const t0 = i / SKYLINE_EQ_N;
+      const t1 = (i + 1) / SKYLINE_EQ_N;
+      // Slight bass emphasis so low end towers punch
+      const f0 = Math.floor(1 + Math.pow(t0, 1.35) * (n * 0.72));
+      const f1 = Math.max(f0 + 1, Math.floor(1 + Math.pow(t1, 1.35) * (n * 0.72)));
+      let sum = 0;
+      let count = 0;
+      for (let j = f0; j < f1 && j < n; j++) {
+        sum += freq[j];
+        count++;
+      }
+      const raw = count ? sum / (count * 255) : 0;
+      target = Math.pow(Math.min(1, raw * 1.15), 0.82);
+    } else if (!playing) {
+      target *= 0.55;
+    }
+    // Snappy rise, softer fall — classic EQ bar feel
+    const rate = target > skylineEq[i] ? 0.42 : 0.16;
+    skylineEq[i] += (target - skylineEq[i]) * rate;
+  }
+}
+
+function sampleSkylineEq(t) {
+  const x = Math.max(0, Math.min(0.999, t)) * (SKYLINE_EQ_N - 1);
+  const i = x | 0;
+  const u = x - i;
+  const a = skylineEq[i];
+  const b = skylineEq[Math.min(SKYLINE_EQ_N - 1, i + 1)];
+  return a + (b - a) * u;
+}
+
 function skylineLayerByName(name) {
   if (name === "near") return skylineNear;
   if (name === "mid") return skylineMid;
@@ -4150,6 +4190,8 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
   const off = ((scroll % loopW) + loopW) % loopW;
   const musicHot = playing && (bass + mid + air + peak) * 0.25 > 0.06;
   const drive = FX.gridDrive || 0;
+  // Near layer is the loud EQ strip; far is a quieter echo
+  const eqAmp = layerName === "near" ? 1 : layerName === "mid" ? 0.72 : 0.38;
   ctx.save();
   for (let bi = 0; bi < buildings.length; bi++) {
     const b = buildings[bi];
@@ -4157,14 +4199,32 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
     for (let k = -1; k <= 1; k++) {
       const x = b.x - off + k * loopW;
       if (x + b.w < -4 || x > W + 4) continue;
-      // Bob lifts the roof only — base stays planted on groundY
-      const top = groundY - b.h - bob * (0.35 + b.hue * 0.4);
-      const bh = Math.max(2, groundY - top);
+      // Screen-x samples the EQ (bass left → air right) — city becomes the analyzer
+      const eq = sampleSkylineEq((x + b.w * 0.5) / Math.max(1, W));
+      const hMul = 0.32 + eq * (0.95 + drive * 0.25) * eqAmp;
+      const liveH = Math.max(4, b.h * hMul + bob * (0.35 + b.hue * 0.4));
+      // Base stays planted on groundY — roof rides the spectrum
+      const top = groundY - liveH;
+      const bh = liveH;
       ctx.globalCompositeOperation = "source-over";
       ctx.fillStyle = `rgba(${12 + b.hue * 18}, ${8 + b.hue * 10}, ${28 + b.hue * 40}, ${alpha})`;
       ctx.fillRect(x, top, b.w, bh);
-      ctx.fillStyle = `rgba(255, 110, 168, ${0.08 + air * 0.12})`;
+      // Roof lip brightens with this bar's energy
+      const roofA = (0.1 + eq * 0.55 * eqAmp + air * 0.1) * alpha;
+      ctx.fillStyle =
+        eq > 0.55
+          ? `rgba(69, 224, 255, ${roofA})`
+          : eq > 0.3
+            ? `rgba(255, 110, 168, ${roofA})`
+            : `rgba(240, 197, 106, ${roofA * 0.85})`;
       ctx.fillRect(x, top, b.w, 2);
+      // Soft EQ tip glow on hot bars
+      if (eq > 0.28 && eqAmp > 0.5) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = `rgba(159, 217, 255, ${eq * 0.18 * eqAmp * alpha})`;
+        ctx.fillRect(x, top - 6 - eq * 10, b.w, 8 + eq * 12);
+        ctx.globalCompositeOperation = "source-over";
+      }
 
       if (drawWindows && b.windows) {
         const winW = Math.max(2, (b.w / (b.cols || 4)) * 0.55);
@@ -4187,7 +4247,7 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
                   Math.sin(now * 0.0022 + win.phase + mid * 2.5 + bass * 1.5));
           const kickFlash = win.band === "bass" ? bass * 0.55 : 0;
           const a =
-            (0.06 + band * 0.7 + drive * 0.35 + kickFlash) *
+            (0.06 + band * 0.7 + drive * 0.35 + kickFlash + eq * 0.35) *
             tw *
             (musicHot ? 1 : 0.45) *
             alpha;
@@ -4227,12 +4287,14 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
  * Classic side-view highway + skyline strip — flat parallax, no vanish grid.
  */
 function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
+  updateSkylineEq(now);
   const roadTop = H * 0.62;
   // Buildings plant flush on the highway shoulder (no floating gap)
   const groundY = roadTop;
   // Tallest near-layer roofs (~0.42H) — sun peeks over, not fully above
   const tallRoofY = groundY - H * 0.42;
-  skylineKickBob = smooth(skylineKickBob, bass * 10 + snare * 4, 0.22);
+  // Soft kick bob only — EQ owns the big vertical motion
+  skylineKickBob = smooth(skylineKickBob, bass * 5 + snare * 2, 0.22);
   const bob = skylineKickBob;
   // Smooth drive — raw bass was hitching scroll every kick
   const driveTarget = 0.7 + FX.gridDrive * 1.6 + bass * 0.9 + mid * 0.45;
