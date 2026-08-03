@@ -39,6 +39,8 @@ let skylineKickBob = 0;
 let skylineScrollPx = 0;
 /** Smoothed scroll rate — avoids bass spikes hitching the strip. */
 let skylineDriveSmooth = 1.1;
+/** Px advanced per ~16.7ms at driveSmooth=1 — shared by city scroll + party spawn velocity. */
+const SKYLINE_SCROLL_RATE = 3.8;
 /** Lit window flocks — Skyline's answer to Night Drive grid cells. */
 const skylineWinLits = [];
 const SKYLINE_WIN_MAX = 220;
@@ -4317,6 +4319,8 @@ function spawnSkylineParty(kind, strength = 0.5) {
   const buildings = skylineLayerByName(layerName);
   if (!buildings.length) return;
   const scrollMul = layerName === "near" ? 1.0 : layerName === "mid" ? 0.5 : 0.18;
+  // Buildings move left on screen as scroll advances — particles inherit that velocity
+  const buildingVx = -scrollMul * skylineDriveSmooth * SKYLINE_SCROLL_RATE;
   const scroll = skylineScrollPx * scrollMul;
   const loopW = buildings.loopW || W * 4;
   const off = ((scroll % loopW) + loopW) % loopW;
@@ -4368,11 +4372,14 @@ function spawnSkylineParty(kind, strength = 0.5) {
             ? palette.accent
             : palette.glow
           : SW_RAINBOW[(Math.random() * SW_RAINBOW.length) | 0];
+      // Burst is relative to the building; add buildingVx so confetti rides with the tower
+      const relVx = Math.cos(ang) * speed + (Math.random() - 0.5) * 1.2;
+      const relVy = Math.sin(ang) * speed - 0.5 - Math.random() * 1.8;
       skylineParty.push({
         x: cx + (Math.random() - 0.5) * pick.b.w * 0.35,
         y: roofY + Math.random() * 4,
-        vx: Math.cos(ang) * speed + (Math.random() - 0.5) * 1.2 - skylineDriveSmooth * 0.2,
-        vy: Math.sin(ang) * speed - 0.5 - Math.random() * 1.8,
+        vx: buildingVx + relVx,
+        vy: relVy,
         life: 1,
         decay: kind === "hat" ? 0.022 + Math.random() * 0.02 : 0.011 + Math.random() * 0.016,
         r: kind === "kick" ? 1.6 + Math.random() * 3.4 : 1.0 + Math.random() * 2.4,
@@ -4382,6 +4389,7 @@ function spawnSkylineParty(kind, strength = 0.5) {
         rot: Math.random() * Math.PI * 2,
         grav: kind === "kick" ? 0.14 : kind === "snare" ? 0.1 : 0.07,
         confetti: kind === "kick" || (kind === "snare" && Math.random() > 0.55),
+        buildingVx,
       });
     }
   }
@@ -4393,12 +4401,14 @@ function updateSkylineParty(dt) {
     return;
   }
   const t = dt / 16;
-  const drift = skylineDriveSmooth * 0.35 * t;
   for (let i = skylineParty.length - 1; i >= 0; i--) {
     const p = skylineParty[i];
     p.vy += p.grav * t;
-    p.vx *= 0.995;
-    p.x += p.vx * t - drift;
+    // Drag only the burst relative to the building — keep inherited cruise
+    const baseVx = p.buildingVx || 0;
+    const relVx = p.vx - baseVx;
+    p.vx = baseVx + relVx * 0.992;
+    p.x += p.vx * t;
     p.y += p.vy * t;
     p.rot += p.spin * t;
     p.life -= p.decay * t;
@@ -4701,7 +4711,7 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   skylineDriveSmooth = smooth(skylineDriveSmooth, driveTarget, 0.11);
   const dt = Math.min(33, PERF.emaDt || 16.7);
   // Continuous px scroll only — do NOT add FX.gridScroll (it wraps 0→1 and jumps)
-  skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * 3.8;
+  skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * SKYLINE_SCROLL_RATE;
   const scroll = skylineScrollPx;
 
   // Sky down to the road line
