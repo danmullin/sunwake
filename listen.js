@@ -19,6 +19,15 @@ const hideUiBtn = document.getElementById("hide-ui");
 const uiPeek = document.getElementById("ui-peek");
 const brandEyebrow = document.getElementById("brand-eyebrow");
 const vizSwitchBtn = document.getElementById("viz-switch");
+const vizPicker = document.getElementById("viz-picker");
+
+const VIZ_MODE_LABELS = {
+  nightDrive: "Night Drive",
+  rainDrive: "Rain Drive",
+  tunnel: "Tunnel",
+  arcade: "Arcade",
+  skyline: "Skyline",
+};
 
 const VIZ_MODE_KEY = "sunwake.vizMode";
 /** @type {"nightDrive" | "rainDrive" | "skyline" | "tunnel" | "arcade"} */
@@ -974,6 +983,7 @@ function setUiHidden(hidden) {
   stage.classList.toggle("ui-hidden", hidden);
   if (uiPeek) uiPeek.hidden = !hidden;
   if (hideUiBtn) hideUiBtn.textContent = hidden ? "Show UI" : "Hide UI";
+  if (hidden) setVizPickerOpen(false);
 }
 
 function toggleUiHidden() {
@@ -4063,20 +4073,15 @@ function syncVizModeUi() {
     const on = btn.getAttribute("data-viz") === vizMode;
     btn.classList.toggle("is-active", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
+    if (btn.getAttribute("role") === "menuitemradio") {
+      btn.setAttribute("aria-checked", on ? "true" : "false");
+    }
   }
   if (brandEyebrow) brandEyebrow.textContent = vizModeLabel();
   if (vizSwitchBtn) {
-    const i = VIZ_MODES.indexOf(vizMode);
-    const nextMode = VIZ_MODES[(i < 0 ? 0 : i + 1) % VIZ_MODES.length];
-    const labels = {
-      nightDrive: "Night Drive",
-      rainDrive: "Rain Drive",
-      tunnel: "Tunnel",
-      arcade: "Arcade",
-      skyline: "Skyline",
-    };
-    vizSwitchBtn.textContent = labels[nextMode] ?? "Night Drive";
-    vizSwitchBtn.title = `Switch to ${labels[nextMode] ?? "Night Drive"}`;
+    const label = VIZ_MODE_LABELS[vizMode] ?? "Scenes";
+    vizSwitchBtn.textContent = label;
+    vizSwitchBtn.title = "Choose scene (N)";
   }
   // Tuck Effects panel in non–Night Drive modes (Skyline, Tunnel, Arcade)
   if (sky || tun || arc) {
@@ -4092,10 +4097,23 @@ function syncVizModeUi() {
   }
 }
 
+function setVizPickerOpen(open) {
+  if (!vizPicker || !vizSwitchBtn) return;
+  const show = !!open && !vizSwitchBtn.hidden && !stage.classList.contains("ui-hidden");
+  vizPicker.hidden = !show;
+  vizSwitchBtn.setAttribute("aria-expanded", show ? "true" : "false");
+}
+
+function toggleVizPicker() {
+  if (!vizPicker || vizSwitchBtn?.hidden) return;
+  setVizPickerOpen(vizPicker.hidden);
+}
+
 function setVizMode(mode) {
   if (!VIZ_MODES.includes(mode)) return;
   if (mode === vizMode) {
     syncVizModeUi();
+    setVizPickerOpen(false);
     return;
   }
   vizMode = mode;
@@ -4127,6 +4145,7 @@ function setVizMode(mode) {
     arcadeFlash = 0;
   }
   syncVizModeUi();
+  setVizPickerOpen(false);
   if (statusEl && (started || playing)) {
     statusEl.textContent = vizModeLabel();
   }
@@ -5494,19 +5513,24 @@ function drawArcadeCabinet(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = "#020308";
   ctx.fillRect(screenX, screenY, screenW, screenH);
 
+  // Sun sits slightly above center so EQ chrome doesn't eat it
   const scx = screenX + screenW * 0.5;
-  const scy = screenY + screenH * 0.5;
+  const scy = screenY + screenH * 0.42;
   const sMax = Math.max(screenW, screenH) * 0.72;
+  const breath = 0.5 + 0.5 * Math.sin(now * 0.0013);
+  const heat = Math.min(1, bass * 0.9 + peak * 0.5 + solo * 0.4);
+  const sunR = Math.min(screenW, screenH) * (0.055 + bass * 0.035 + solo * 0.02 + breath * 0.008);
 
-  // Soft center glow
+  // Soft center glow — sun bruises the tube
   const tubeGlow = ctx.createRadialGradient(scx, scy, 0, scx, scy, sMax);
-  tubeGlow.addColorStop(0, `rgba(30, 80, 120, ${0.18 + bass * 0.22 + arcadeFlash * 0.2})`);
-  tubeGlow.addColorStop(0.55, `rgba(20, 40, 70, ${0.08 + mid * 0.1})`);
+  tubeGlow.addColorStop(0, `rgba(255, 140, 90, ${0.12 + heat * 0.22 + arcadeFlash * 0.12}`);
+  tubeGlow.addColorStop(0.25, `rgba(255, 80, 140, ${0.1 + mid * 0.12}`);
+  tubeGlow.addColorStop(0.55, `rgba(40, 90, 140, ${0.1 + bass * 0.12}`);
   tubeGlow.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = tubeGlow;
   ctx.fillRect(screenX, screenY, screenW, screenH);
 
-  // Vector starfield — classic warp
+  // Vector starfield — warp out from the sun
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.lineCap = "round";
@@ -5524,7 +5548,10 @@ function drawArcadeCabinet(now, bass, mid, air, peak, snare, hat, solo) {
     if (px < screenX - 20 || px > screenX + screenW + 20 || py < screenY - 20 || py > screenY + screenH + 20) {
       continue;
     }
-    // Trail from previous depth (vector streak)
+    const dx = px - scx;
+    const dy = py - scy;
+    if (dx * dx + dy * dy < sunR * sunR * 1.15) continue;
+
     const zPrev = Math.min(1, star.z + arcadeWarp * star.speed * 6);
     const invP = 1 / zPrev;
     const qx = scx + Math.cos(star.a) * invP * sMax * 0.08;
@@ -5544,41 +5571,127 @@ function drawArcadeCabinet(now, bass, mid, air, peak, snare, hat, solo) {
     ctx.moveTo(qx, qy);
     ctx.lineTo(px, py);
     ctx.stroke();
-    // Bright tip
-    ctx.fillStyle = `rgba(255, 255, 255, ${a * 0.85})`;
+    ctx.fillStyle = `rgba(255, 255, 255, ${a * 0.85}`);
     ctx.beginPath();
     ctx.arc(px, py, Math.max(0.5, near * 1.6), 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  // Vector geometric rings — coin-op chrome inside the glass
+  // The sun — vector coin-op heart of Sunwake
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  const rings = 4;
-  for (let r = 0; r < rings; r++) {
-    const t = (now * 0.00035 + r * 0.22) % 1;
-    const rad = sMax * (0.08 + t * 0.55) * (0.85 + bass * 0.25);
-    const a = (1 - t) * (0.12 + mid * 0.25 + solo * 0.2);
-    if (a < 0.04) continue;
-    ctx.strokeStyle =
-      r % 2 === 0 ? `rgba(69, 224, 255, ${a})` : `rgba(255, 110, 168, ${a})`;
-    ctx.lineWidth = 1 + (1 - t) * 1.5;
+
+  const halo = ctx.createRadialGradient(scx, scy, sunR * 0.2, scx, scy, sunR * 4.2);
+  halo.addColorStop(0, `rgba(255, 230, 180, ${0.35 + heat * 0.35}`);
+  halo.addColorStop(0.25, `rgba(255, 140, 90, ${0.22 + mid * 0.2}`);
+  halo.addColorStop(0.55, `rgba(255, 80, 140, ${0.12 + bass * 0.12}`);
+  halo.addColorStop(1, "rgba(69, 224, 255, 0)");
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(scx, scy, sunR * 4.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  const rayN = 12;
+  const spin = now * 0.00012 + bass * 0.2;
+  for (let i = 0; i < rayN; i++) {
+    const ang = spin + (i / rayN) * Math.PI * 2;
+    const flicker = 0.5 + 0.5 * Math.sin(now * 0.0022 + i * 1.6);
+    const len = sunR * (2.8 + heat * 2.4 + breath * 0.6) * (0.75 + (i % 3) * 0.18);
+    const half = (0.028 + bass * 0.035 + peak * 0.02) * flicker;
+    const a = (0.05 + heat * 0.1) * flicker;
+    ctx.fillStyle =
+      i % 2 === 0 ? `rgba(255, 180, 90, ${a})` : `rgba(255, 90, 140, ${a * 0.9})`;
     ctx.beginPath();
-    ctx.arc(scx, scy, rad, 0, Math.PI * 2);
+    ctx.moveTo(scx, scy);
+    ctx.lineTo(scx + Math.cos(ang - half) * len, scy + Math.sin(ang - half) * len);
+    ctx.lineTo(scx + Math.cos(ang + half) * len, scy + Math.sin(ang + half) * len);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const petalN = 8;
+  for (let i = 0; i < petalN; i++) {
+    const ang = -spin * 0.7 + (i / petalN) * Math.PI * 2;
+    const pr = sunR * (1.55 + mid * 0.35 + Math.sin(now * 0.0018 + i) * 0.12);
+    const spread = 0.22 + solo * 0.1;
+    ctx.strokeStyle =
+      i % 2 === 0
+        ? `rgba(240, 197, 106, ${0.25 + mid * 0.35})`
+        : `rgba(255, 110, 168, ${0.22 + air * 0.3})`;
+    ctx.lineWidth = 1.2 + bass * 1.4;
+    ctx.beginPath();
+    ctx.arc(scx, scy, pr, ang - spread, ang + spread);
     ctx.stroke();
   }
-  // Crosshair / reticule
-  const retA = 0.12 + hat * 0.35 + air * 0.15;
-  ctx.strokeStyle = `rgba(240, 197, 106, ${retA})`;
+
+  for (let k = 0; k < 3; k++) {
+    const rr = sunR * (1.15 + k * 0.45 + bass * 0.08);
+    ctx.strokeStyle =
+      k === 0
+        ? `rgba(255, 230, 180, ${0.35 + heat * 0.3})`
+        : k === 1
+          ? `rgba(255, 110, 168, ${0.2 + mid * 0.25})`
+          : `rgba(69, 224, 255, ${0.15 + air * 0.25})`;
+    ctx.lineWidth = 1 + (2 - k) * 0.6;
+    ctx.beginPath();
+    ctx.arc(scx, scy, rr, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  if (bass > 0.18 || peak > 0.25) {
+    const pulseR = sunR * (1.8 + bass * 1.4 + arcadeFlash * 0.8);
+    ctx.strokeStyle = `rgba(255, 200, 120, ${0.15 + bass * 0.35 + arcadeFlash * 0.25}`);
+    ctx.lineWidth = 1.5 + bass * 2;
+    ctx.beginPath();
+    ctx.arc(scx, scy, pulseR, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  const disk = ctx.createRadialGradient(scx - sunR * 0.25, scy - sunR * 0.3, 0, scx, scy, sunR);
+  disk.addColorStop(0, `rgba(255, 250, 230, ${0.95}`);
+  disk.addColorStop(0.35, `rgba(255, 200, 120, ${0.9}`);
+  disk.addColorStop(0.7, `rgba(255, 120, 90, ${0.85}`);
+  disk.addColorStop(1, `rgba(255, 70, 130, ${0.55 + solo * 0.25}`);
+  ctx.fillStyle = disk;
+  ctx.beginPath();
+  ctx.arc(scx, scy, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.45 + peak * 0.4}`);
+  ctx.lineWidth = 1.5 + bass * 1.5;
+  ctx.beginPath();
+  ctx.arc(scx, scy, sunR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const ret = sunR * (0.35 + hat * 0.25);
+  ctx.strokeStyle = `rgba(20, 10, 30, ${0.35 + hat * 0.25}`);
   ctx.lineWidth = 1;
-  const ret = 18 + bass * 22;
   ctx.beginPath();
   ctx.moveTo(scx - ret, scy);
   ctx.lineTo(scx + ret, scy);
   ctx.moveTo(scx, scy - ret);
   ctx.lineTo(scx, scy + ret);
   ctx.stroke();
+
+  ctx.restore();
+
+  // Orbit rings around the sun
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const rings = 3;
+  for (let r = 0; r < rings; r++) {
+    const t = (now * 0.00028 + r * 0.28) % 1;
+    const rad = sunR * (2.4 + t * 5.5) * (0.9 + bass * 0.2);
+    const a = (1 - t) * (0.1 + mid * 0.22 + solo * 0.15);
+    if (a < 0.04) continue;
+    ctx.strokeStyle =
+      r % 2 === 0 ? `rgba(69, 224, 255, ${a})` : `rgba(255, 110, 168, ${a})`;
+    ctx.lineWidth = 1 + (1 - t) * 1.4;
+    ctx.beginPath();
+    ctx.arc(scx, scy, rad, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 
   // Bottom-of-screen EQ as vector bars (inside CRT)
@@ -5600,8 +5713,7 @@ function drawArcadeCabinet(now, bass, mid, air, peak, snare, hat, solo) {
           : `rgba(240, 197, 106, ${0.28 + v * 0.55})`;
     ctx.fillStyle = col;
     ctx.fillRect(x, barBaseY - h, barSlot - 2, h);
-    // Cap spark
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.2 + v * 0.55})`;
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.2 + v * 0.55}`);
     ctx.fillRect(x, barBaseY - h - 1, barSlot - 2, 2);
   }
   ctx.restore();
@@ -5614,17 +5726,15 @@ function drawArcadeCabinet(now, bass, mid, air, peak, snare, hat, solo) {
   for (let y = screenY; y < screenY + screenH; y += scanStep) {
     ctx.fillRect(screenX, y, screenW, 1);
   }
-  // Soft phosphor roll (slow vertical drift)
   const rollY = screenY + ((now * 0.04) % screenH);
   const roll = ctx.createLinearGradient(0, rollY - 40, 0, rollY + 40);
   roll.addColorStop(0, "rgba(120, 200, 255, 0)");
-  roll.addColorStop(0.5, `rgba(120, 200, 255, ${0.04 + air * 0.05})`);
+  roll.addColorStop(0.5, `rgba(120, 200, 255, ${0.04 + air * 0.05}`);
   roll.addColorStop(1, "rgba(120, 200, 255, 0)");
   ctx.fillStyle = roll;
   ctx.fillRect(screenX, screenY, screenW, screenH);
   ctx.restore();
 
-  // CRT glass reflection + edge darkening
   const glass = ctx.createLinearGradient(screenX, screenY, screenX + screenW, screenY + screenH);
   glass.addColorStop(0, "rgba(255,255,255,0.06)");
   glass.addColorStop(0.35, "rgba(255,255,255,0)");
@@ -5640,9 +5750,8 @@ function drawArcadeCabinet(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = screenVig;
   ctx.fillRect(screenX, screenY, screenW, screenH);
 
-  // Flash on drums
   if (arcadeFlash > 0.05) {
-    ctx.fillStyle = `rgba(180, 220, 255, ${arcadeFlash * 0.12})`;
+    ctx.fillStyle = `rgba(255, 200, 160, ${arcadeFlash * 0.1}`);
     ctx.fillRect(screenX, screenY, screenW, screenH);
   }
 
@@ -6229,6 +6338,17 @@ function onKey(e) {
     statusEl.textContent = FX_TOGGLES.whipVerticals
       ? "whip verticals on (V / Effects panel)"
       : "whip verticals off";
+  } else if (e.code === "KeyN") {
+    e.preventDefault();
+    if (vizSwitchBtn && !vizSwitchBtn.hidden) {
+      if (stage.classList.contains("ui-hidden")) setUiHidden(false);
+      toggleVizPicker();
+    }
+  } else if (e.code === "Escape") {
+    if (vizPicker && !vizPicker.hidden) {
+      e.preventDefault();
+      setVizPickerOpen(false);
+    }
   }
 }
 
@@ -6393,15 +6513,21 @@ filePick.addEventListener("change", () => {
 filePick.addEventListener("click", (e) => e.stopPropagation());
 
 document.querySelectorAll("[data-viz]").forEach((btn) => {
-  btn.addEventListener("click", () => {
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
     const mode = btn.getAttribute("data-viz");
     if (VIZ_MODES.includes(mode)) setVizMode(mode);
   });
 });
-vizSwitchBtn?.addEventListener("click", () => {
-  const i = VIZ_MODES.indexOf(vizMode);
-  const next = VIZ_MODES[(i < 0 ? 0 : i + 1) % VIZ_MODES.length];
-  setVizMode(next);
+vizSwitchBtn?.addEventListener("click", (e) => {
+  e.stopPropagation();
+  toggleVizPicker();
+});
+document.addEventListener("click", (e) => {
+  if (!vizPicker || vizPicker.hidden) return;
+  const wrap = vizSwitchBtn?.closest(".viz-switch-wrap");
+  if (wrap && wrap.contains(e.target)) return;
+  setVizPickerOpen(false);
 });
 syncVizModeUi();
 

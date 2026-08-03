@@ -11,7 +11,7 @@ Synthwave audio visualizer — a night-drive sea of light that reacts to your mu
 | **Night Drive** (default) | Perspective grid sea, camera sway, full Effects panel |
 | **Rain Drive** | Same highway in a storm — cloudy overcast, wet asphalt, denser rain, lightning bolts on drums |
 | **Tunnel** | Repeating rib lights racing past; bass = pulse rings on the walls |
-| **Arcade** | CRT bezel, scanlines, vector starfield, EQ as coin-op chrome |
+| **Arcade** | CRT bezel, scanlines, vector starfield + Sunwake sun, EQ as coin-op chrome |
 | **Skyline** | Flat side-view skyline + highway strip (parallax buildings, lane dashes) |
 
 Pick on the gate before you listen, or cycle from the chrome button while playing. Preference is saved in the browser. Skyline / Tunnel / Arcade are web-first; mobile bake comes later when they feel ready.
@@ -32,8 +32,9 @@ Or open `index.html` via any static file server (modules need HTTP, not `file://
 1. Choose a scene on the gate (**Night Drive**, **Rain Drive**, **Tunnel**, **Arcade**, or **Skyline**)
 2. **Open a song** — pick a local audio file, or drag one onto the page
 3. **Listen to system audio** — Chrome or Edge → Entire screen → check **Share system audio** (Spotify, YouTube, etc.)
-4. **Hide UI** (`H`) for a clean full-screen view
-5. **Effects** panel (`F`) — Night Drive / Rain Drive toggles; drag the title bar to move it (hidden in Tunnel / Arcade / Skyline)
+4. Switch scenes anytime from the chrome **Scenes** button (or press **N**) — opens a picker; Escape closes it
+5. **Hide UI** (`H`) for a clean full-screen view
+6. **Effects** panel (`F`) — Night Drive / Rain Drive toggles; drag the title bar to move it (hidden in Tunnel / Arcade / Skyline)
 
 ## Tips
 

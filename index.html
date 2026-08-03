@@ -57,9 +57,18 @@
         </div>
         <p id="status" class="status">waiting…</p>
         <div class="presets chrome-presets" id="chrome-presets" hidden></div>
-        <button id="viz-switch" type="button" class="toggle viz-switch-btn" hidden title="Switch visualizer">
-          Skyline
-        </button>
+        <div class="viz-switch-wrap">
+          <button id="viz-switch" type="button" class="toggle viz-switch-btn" hidden title="Choose scene (N)" aria-haspopup="true" aria-expanded="false" aria-controls="viz-picker">
+            Scenes
+          </button>
+          <div id="viz-picker" class="viz-picker" hidden role="menu" aria-label="Visualizer scenes">
+            <button type="button" class="viz-mode-btn" role="menuitemradio" data-viz="nightDrive" aria-checked="false">Night Drive</button>
+            <button type="button" class="viz-mode-btn" role="menuitemradio" data-viz="rainDrive" aria-checked="false">Rain Drive</button>
+            <button type="button" class="viz-mode-btn" role="menuitemradio" data-viz="tunnel" aria-checked="false">Tunnel</button>
+            <button type="button" class="viz-mode-btn" role="menuitemradio" data-viz="arcade" aria-checked="false">Arcade</button>
+            <button type="button" class="viz-mode-btn" role="menuitemradio" data-viz="skyline" aria-checked="false">Skyline</button>
+          </div>
+        </div>
         <button id="toggle" type="button" class="toggle" hidden>Pause</button>
         <button id="restart" type="button" class="toggle" hidden>Restart</button>
         <button id="system-chrome" type="button" class="toggle" hidden>System audio</button>
