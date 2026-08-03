@@ -4705,7 +4705,7 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   const pulse = fxOn("sunPulse");
   const sunX = W * 0.22;
   const beat = pulse ? bass * 0.1 + peak * 0.06 + snare * 0.04 : 0;
-  const sunR = Math.min(W, H) * (0.11 + beat) * SUN_SCALE * 0.9;
+  const sunR = Math.min(W, H) * (0.085 + beat * 0.85) * SUN_SCALE * 0.78;
   const sunY = tallRoofY + sunR * 0.45;
   const breath = 0.5 + 0.5 * Math.sin(now * 0.0012);
   const heat = Math.min(1, bass * 0.85 + peak * 0.55 + solo * 0.35);
@@ -4868,13 +4868,6 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     ctx.fill();
   }
   ctx.restore();
-
-  // Dark limb
-  ctx.strokeStyle = `rgba(40, 8, 28, ${0.4 + bass * 0.2})`;
-  ctx.lineWidth = 2 + heat;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * 0.98, 0, Math.PI * 2);
-  ctx.stroke();
 }
 
 /**
