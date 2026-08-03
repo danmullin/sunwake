@@ -1,6 +1,6 @@
 # Sunwake
 
-Synthwave audio visualizer — a night-drive sea of light that reacts to your music, plus a classic side-view **Skyline** highway strip.
+Synthwave audio visualizer — a night-drive sea of light that reacts to your music, a stormy **Rain Drive** cousin, plus a classic side-view **Skyline** highway strip.
 
 **Live:** https://danmullin.github.io/sunwake/
 
@@ -9,9 +9,10 @@ Synthwave audio visualizer — a night-drive sea of light that reacts to your mu
 | Mode | Feel |
 |------|------|
 | **Night Drive** (default) | Perspective grid sea, camera sway, full Effects panel |
+| **Rain Drive** | Same highway in a storm — wet asphalt, neon reflections, denser rain, wiper arcs on hats |
 | **Skyline** | Flat side-view skyline + highway strip (parallax buildings, lane dashes) |
 
-Pick on the gate before you listen, or switch from the chrome button while playing. Preference is saved in the browser. Skyline is web-first; mobile bake comes later when it feels ready.
+Pick on the gate before you listen, or cycle from the chrome button while playing. Preference is saved in the browser. Skyline is web-first; mobile bake comes later when it feels ready.
 
 ## Run
 
@@ -26,17 +27,18 @@ Or open `index.html` via any static file server (modules need HTTP, not `file://
 
 ## Listen
 
-1. Choose **Night Drive** or **Skyline**
+1. Choose **Night Drive**, **Rain Drive**, or **Skyline**
 2. **Open a song** — pick a local audio file, or drag one onto the page
 3. **Listen to system audio** — Chrome or Edge → Entire screen → check **Share system audio** (Spotify, YouTube, etc.)
 4. **Hide UI** (`H`) for a clean full-screen view
-5. **Effects** panel (`F`) — Night Drive toggles; drag the title bar to move it (hidden in Skyline)
+5. **Effects** panel (`F`) — Night Drive / Rain Drive toggles; drag the title bar to move it (hidden in Skyline)
 
 ## Tips
 
 - Chrome or Edge works best for system audio capture
 - No songs are bundled — bring your own
-- **B-sides** in the Effects panel are experimental FX (off by default; Night Drive)
+- **B-sides** in the Effects panel are experimental FX (off by default; Night Drive family)
+- Rain Drive forces storm weather (rain, fog, wet road, hat-synced wipers) even if some weather toggles are off
 
 ```powershell
 node _check-public.js

@@ -141,8 +141,8 @@ body {
 
 .viz-mode-picker {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.35rem;
   margin: 0 0 1rem;
 }
 
@@ -150,16 +150,16 @@ body {
   appearance: none;
   -webkit-appearance: none;
   min-height: 2.4rem;
-  padding: 0.45rem 0.55rem;
+  padding: 0.45rem 0.35rem;
   border-radius: 10px;
   border: 1px solid rgba(159, 217, 255, 0.28);
   background: rgba(8, 12, 28, 0.72);
   background-clip: padding-box;
   color: rgba(200, 220, 245, 0.78);
   font-family: Orbitron, sans-serif;
-  font-size: 0.52rem;
+  font-size: 0.48rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   outline: none;

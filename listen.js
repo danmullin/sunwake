@@ -21,14 +21,37 @@ const brandEyebrow = document.getElementById("brand-eyebrow");
 const vizSwitchBtn = document.getElementById("viz-switch");
 
 const VIZ_MODE_KEY = "sunwake.vizMode";
-/** @type {"nightDrive" | "skyline"} */
+/** @type {"nightDrive" | "rainDrive" | "skyline"} */
 let vizMode = "nightDrive";
+const VIZ_MODES = ["nightDrive", "rainDrive", "skyline"];
 try {
   const stored = localStorage.getItem(VIZ_MODE_KEY);
-  if (stored === "skyline" || stored === "nightDrive") vizMode = stored;
+  if (stored === "skyline" || stored === "nightDrive" || stored === "rainDrive") vizMode = stored;
 } catch {
   /* ignore */
 }
+
+function isSeaDrive() {
+  return vizMode === "nightDrive" || vizMode === "rainDrive";
+}
+
+function vizModeLabel(mode = vizMode) {
+  if (mode === "skyline") return "skyline";
+  if (mode === "rainDrive") return "rain drive";
+  return "night drive";
+}
+
+/** Rain Drive — dual windshield wipers (screen-space arcs). */
+const wipers = [
+  { pivotX: 0.18, phase: 0.2, active: 0 },
+  { pivotX: 0.82, phase: Math.PI + 0.4, active: 0 },
+];
+let wiperPulse = 0;
+/** Road splash sparks on wet asphalt (Rain Drive). */
+const rainSplashes = [];
+const RAIN_SPLASH_MAX = 48;
+/** Brief storm flash (0..1). */
+let stormFlash = 0;
 
 /** Side-scroll city for Skyline mode — regenerated on resize. */
 const skylineFar = [];
@@ -1287,6 +1310,9 @@ function seedWorld() {
   mistSheets.length = 0;
   cloudDeck.length = 0;
   shooting.length = 0;
+  rainSplashes.length = 0;
+  stormFlash = 0;
+  wiperPulse = 0;
   horizonBands.length = 0;
   meteors.length = 0;
   mirrorCells.length = 0;
@@ -1353,7 +1379,7 @@ function seedWorld() {
     });
   }
 
-  for (let i = 0; i < 110; i++) {
+  for (let i = 0; i < 160; i++) {
     rain.push({
       x: Math.random(),
       y: Math.random(),
@@ -1726,7 +1752,9 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   const lead = Math.max(0, mid * 0.55 + air * 1.15 - bass * 0.25);
   const soloTarget = Math.pow(Math.min(1, lead * 1.35), 1.4);
   FX.solo = smooth(FX.solo, soloTarget, 0.12);
-  FX.mist = smooth(FX.mist, 0.12 + mid * 0.75 + air * 0.2, 0.1);
+  // Rain Drive keeps a wetter floor so streaks never thin out between phrases
+  const mistFloor = vizMode === "rainDrive" ? 0.42 + mid * 0.55 + air * 0.25 : 0.12 + mid * 0.75 + air * 0.2;
+  FX.mist = smooth(FX.mist, mistFloor, vizMode === "rainDrive" ? 0.14 : 0.1);
 
   if (fxOn("blackHole") && fxOn("photonPulse")) {
     const hit = Math.max(0, peak * 1.15 + Math.max(0, bass - 0.12) * 0.85 - 0.05);
@@ -1950,11 +1978,14 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   }
   if (hatFire) {
     spawnDrum("hat");
+    if (vizMode === "rainDrive") {
+      triggerWipers(Math.min(1, 0.45 + hat * 0.9 + air * 0.25));
+    }
     if (fxOn("infallSparks") && fxOn("blackHole")) {
       spawnInfall(0.35 + hat * 0.65);
     }
     // Hats answer flocks with meteors racing *away* from the sun down the verticals
-    if (playing && fxOn("vanishingMeteors")) {
+    if (playing && fxOn("vanishingMeteors") && vizMode !== "rainDrive") {
       const burst = 1 + (hat > 0.2 ? 1 : 0) + (Math.random() > 0.55 ? 1 : 0);
       for (let i = 0; i < burst; i++) {
         const side = Math.random() > 0.5 ? 1 : -1;
@@ -1964,6 +1995,15 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
           hueT: (i / Math.max(1, burst - 1)) * 0.55 + Math.random() * 0.2 + now * 0.00008,
         });
       }
+    }
+  }
+
+  if (vizMode === "rainDrive" && playing) {
+    if (kickFire || (peakKick > 0.06 && peak > 0.2)) {
+      spawnRainSplash(0.55 + bass * 0.5 + peak * 0.35);
+    }
+    if (peakKick > 0.08 && peak > 0.28) {
+      stormFlash = Math.min(1, stormFlash + 0.35 + peak * 0.45);
     }
   }
 
@@ -2219,13 +2259,31 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
   }
 
   for (const d of rain) {
-    d.y += d.sp * (0.7 + FX.mist);
-    d.x += d.drift * (0.7 + FX.mist);
+    const rainBoost = vizMode === "rainDrive" ? 1.45 + FX.mist * 0.35 : 0.7 + FX.mist;
+    d.y += d.sp * rainBoost;
+    d.x += d.drift * rainBoost * (vizMode === "rainDrive" ? 1.25 : 1);
     if (d.y > 1.05) {
       d.y = -0.05;
       d.x = Math.random();
     }
     if (d.x > 1.05) d.x = -0.05;
+  }
+
+  if (vizMode === "rainDrive") {
+    updateWipers();
+    for (let i = rainSplashes.length - 1; i >= 0; i--) {
+      const s = rainSplashes[i];
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vy += 0.00035;
+      s.life -= s.decay;
+      if (s.life <= 0) rainSplashes.splice(i, 1);
+    }
+    stormFlash *= 0.88;
+  } else if (rainSplashes.length) {
+    rainSplashes.length = 0;
+    stormFlash = 0;
+    wiperPulse = 0;
   }
 
   for (const sheet of mistSheets) {
@@ -2802,23 +2860,40 @@ function drawCloudDeck(now) {
 function drawRain(mid) {
   if (!rain.length) return;
   const density = FX.mist;
-  if (density < 0.1) return;
+  if (density < 0.1 && vizMode !== "rainDrive") return;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.lineCap = "round";
-  const visible = 0.25 + density * 0.9;
+  const storm = vizMode === "rainDrive";
+  const visible = storm ? 0.55 + density * 0.85 : 0.25 + density * 0.9;
   for (const d of rain) {
-    const a = d.a * visible;
+    const a = d.a * visible * (storm ? 1.15 : 1);
     if (a < 0.04) continue;
     const x = d.x * W;
     const y = d.y * H;
-    const len = d.len * H;
-    ctx.strokeStyle = `rgba(180, 220, 255, ${a})`;
-    ctx.lineWidth = 1;
+    const len = d.len * H * (storm ? 1.35 : 1);
+    ctx.strokeStyle = storm
+      ? `rgba(160, 210, 255, ${Math.min(0.85, a)})`
+      : `rgba(180, 220, 255, ${a})`;
+    ctx.lineWidth = storm ? 1.15 : 1;
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.lineTo(x + len * 0.35, y + len);
+    ctx.lineTo(x + len * (storm ? 0.55 : 0.35), y + len);
     ctx.stroke();
+  }
+  // Extra sheet of fine drizzle in Rain Drive
+  if (storm) {
+    for (let i = 0; i < 40; i++) {
+      const x = ((i * 97 + density * 40) % 100) / 100 * W;
+      const y = ((i * 53 + performance.now() * 0.08) % 100) / 100 * H;
+      const len = H * (0.008 + (i % 5) * 0.003);
+      ctx.strokeStyle = `rgba(140, 190, 230, ${0.08 + density * 0.12})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len * 0.6, y + len);
+      ctx.stroke();
+    }
   }
   ctx.restore();
 }
@@ -3943,17 +4018,20 @@ function updateMeters(bass, mid, air) {
 
 function syncVizModeUi() {
   const sky = vizMode === "skyline";
+  const storm = vizMode === "rainDrive";
   for (const btn of document.querySelectorAll("[data-viz]")) {
     const on = btn.getAttribute("data-viz") === vizMode;
     btn.classList.toggle("is-active", on);
     btn.setAttribute("aria-pressed", on ? "true" : "false");
   }
-  if (brandEyebrow) brandEyebrow.textContent = sky ? "skyline" : "night drive";
+  if (brandEyebrow) brandEyebrow.textContent = vizModeLabel();
   if (vizSwitchBtn) {
-    vizSwitchBtn.textContent = sky ? "Night Drive" : "Skyline";
-    vizSwitchBtn.title = sky ? "Switch to Night Drive" : "Switch to Skyline";
+    const next =
+      vizMode === "nightDrive" ? "Rain Drive" : vizMode === "rainDrive" ? "Skyline" : "Night Drive";
+    vizSwitchBtn.textContent = next;
+    vizSwitchBtn.title = `Switch to ${next}`;
   }
-  // Effects panel is Night Drive–oriented; tuck it away in Skyline
+  // Effects panel is Night Drive–family oriented; tuck it away in Skyline
   if (sky) {
     setFxPanelHidden(true);
     const peek = document.getElementById("fx-peek");
@@ -3965,10 +4043,12 @@ function syncVizModeUi() {
       peek.hidden = !panel?.classList.contains("fx-panel-hidden");
     }
   }
+  // Rain Drive leans on weather — keep panel available but no special hide
+  void storm;
 }
 
 function setVizMode(mode) {
-  if (mode !== "skyline" && mode !== "nightDrive") return;
+  if (mode !== "skyline" && mode !== "nightDrive" && mode !== "rainDrive") return;
   if (mode === vizMode) {
     syncVizModeUi();
     return;
@@ -3983,13 +4063,21 @@ function setVizMode(mode) {
   if (vizMode === "skyline") {
     gridCells.length = 0;
     gridTrails.length = 0;
+    rainSplashes.length = 0;
+    stormFlash = 0;
+    wiperPulse = 0;
   } else {
     skylineWinLits.length = 0;
     skylineParty.length = 0;
+    if (vizMode !== "rainDrive") {
+      rainSplashes.length = 0;
+      stormFlash = 0;
+      wiperPulse = 0;
+    }
   }
   syncVizModeUi();
   if (statusEl && (started || playing)) {
-    statusEl.textContent = vizMode === "skyline" ? "skyline" : "night drive";
+    statusEl.textContent = vizModeLabel();
   }
 }
 
@@ -4896,6 +4984,200 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   }
 }
 
+function triggerWipers(strength) {
+  wiperPulse = Math.min(1, Math.max(wiperPulse, 0.55 + strength * 0.45));
+  for (const w of wipers) {
+    w.active = Math.min(1, w.active + 0.55 + strength * 0.45);
+  }
+}
+
+function updateWipers() {
+  const drive = 0.028 + wiperPulse * 0.09;
+  wiperPulse *= 0.93;
+  for (const w of wipers) {
+    w.phase += drive * (0.75 + w.active * 1.4);
+    w.active *= 0.962;
+  }
+}
+
+function spawnRainSplash(strength) {
+  const n = Math.max(3, Math.floor(4 + strength * 10));
+  for (let i = 0; i < n; i++) {
+    if (rainSplashes.length >= RAIN_SPLASH_MAX) rainSplashes.shift();
+    rainSplashes.push({
+      x: 0.12 + Math.random() * 0.76,
+      y: 0.72 + Math.random() * 0.22,
+      vx: (Math.random() - 0.5) * 0.012,
+      vy: -0.004 - Math.random() * 0.01 * strength,
+      life: 0.7 + Math.random() * 0.4,
+      decay: 0.018 + Math.random() * 0.02,
+      hue: Math.random() > 0.45 ? "cyan" : Math.random() > 0.5 ? "pink" : "gold",
+      r: 1.2 + Math.random() * 2.4,
+    });
+  }
+}
+
+function drawStormSky(now, bass, mid) {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, "#02040a");
+  g.addColorStop(0.35, `rgb(${4 + mid * 10}, ${10 + bass * 14}, ${18 + mid * 22})`);
+  g.addColorStop(0.68, `rgb(${6 + bass * 8}, ${18 + mid * 16}, ${28 + bass * 18})`);
+  g.addColorStop(1, "#030a12");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // Cool storm shafts — muted cyan, not golden hour
+  const cx = W * 0.5;
+  for (let i = -2; i <= 2; i++) {
+    const x = cx + i * W * 0.11;
+    const shaft = ctx.createLinearGradient(x, 0, x, H * 0.65);
+    shaft.addColorStop(0, `rgba(90, 160, 210, ${0.02 + bass * 0.035 + mid * 0.02})`);
+    shaft.addColorStop(1, "rgba(90, 160, 210, 0)");
+    ctx.fillStyle = shaft;
+    ctx.fillRect(x - W * 0.07, 0, W * 0.14, H * 0.65);
+  }
+
+  if (stormFlash > 0.04) {
+    ctx.fillStyle = `rgba(200, 220, 255, ${stormFlash * 0.22})`;
+    ctx.fillRect(0, 0, W, H * 0.55);
+    ctx.fillStyle = `rgba(140, 180, 220, ${stormFlash * 0.08})`;
+    ctx.fillRect(0, H * 0.45, W, H * 0.2);
+  }
+}
+
+function drawWetAsphalt(now, bass, mid, air) {
+  const horizon = H * 0.52;
+  const seaH = H - horizon;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, horizon, W, seaH);
+  ctx.clip();
+
+  // Darker wet film over the grid sea
+  const wet = ctx.createLinearGradient(0, horizon, 0, H);
+  wet.addColorStop(0, `rgba(2, 8, 16, ${0.18 + mid * 0.12})`);
+  wet.addColorStop(0.4, `rgba(0, 4, 10, ${0.28 + bass * 0.1})`);
+  wet.addColorStop(1, "rgba(0, 0, 0, 0.45)");
+  ctx.fillStyle = wet;
+  ctx.fillRect(0, horizon, W, seaH);
+
+  // Neon road reflections — stretched vertical glows
+  ctx.globalCompositeOperation = "lighter";
+  const vanish = typeof vanishX === "function" ? vanishX() : W * 0.5;
+  for (let i = 0; i < 7; i++) {
+    const t = i / 6;
+    const x = vanish + (t - 0.5) * W * (0.55 + bass * 0.15);
+    const a = 0.04 + mid * 0.08 + air * 0.05;
+    const col =
+      i % 3 === 0
+        ? `rgba(69, 224, 255, ${a})`
+        : i % 3 === 1
+          ? `rgba(255, 110, 168, ${a * 0.85})`
+          : `rgba(240, 197, 106, ${a * 0.7})`;
+    const streak = ctx.createLinearGradient(x, horizon, x, H);
+    streak.addColorStop(0, col);
+    streak.addColorStop(0.35, col.replace(/[\d.]+\)$/, `${a * 0.45})`));
+    streak.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = streak;
+    const half = (6 + t * 18 + bass * 10) * (0.4 + t);
+    ctx.fillRect(x - half, horizon, half * 2, seaH);
+  }
+
+  // Horizontal sheen bands — wet asphalt catching headlights
+  const scroll = (now * 0.00015 + FX.gridScroll * 0.8) % 1;
+  for (let i = 0; i < 6; i++) {
+    const u = (scroll + i / 6) % 1;
+    const y = horizon + Math.pow(u, 1.35) * seaH;
+    const a = (0.04 + mid * 0.06) * (1 - u * 0.5);
+    ctx.strokeStyle = `rgba(180, 220, 255, ${a})`;
+    ctx.lineWidth = 1 + (1 - u) * 2;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(W, y);
+    ctx.stroke();
+  }
+
+  // Splash sparks on the wet road
+  for (const s of rainSplashes) {
+    if (s.life < 0.05) continue;
+    const x = s.x * W;
+    const y = s.y * H;
+    const col =
+      s.hue === "gold"
+        ? `rgba(240, 197, 106, ${s.life * 0.7})`
+        : s.hue === "pink"
+          ? `rgba(255, 110, 168, ${s.life * 0.65})`
+          : `rgba(69, 224, 255, ${s.life * 0.7})`;
+    ctx.fillStyle = col;
+    ctx.beginPath();
+    ctx.arc(x, y, s.r * s.life, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawWipers() {
+  if (vizMode !== "rainDrive") return;
+  const len = Math.min(W, H) * 0.78;
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (const w of wipers) {
+    const px = w.pivotX * W;
+    const py = H * 1.02;
+    const swing = Math.sin(w.phase) * (0.72 + w.active * 0.28);
+    const angle = -Math.PI / 2 + swing * (w.pivotX < 0.5 ? 1 : -1);
+    const tipX = px + Math.cos(angle) * len;
+    const tipY = py + Math.sin(angle) * len;
+    const a = 0.12 + w.active * 0.55 + wiperPulse * 0.25;
+    if (a < 0.08) continue;
+
+    // Cleared wedge ghost
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = `rgba(8, 14, 28, ${0.04 + w.active * 0.06})`;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    const sweep = 0.14 + w.active * 0.1;
+    ctx.arc(px, py, len, angle - sweep, angle + sweep);
+    ctx.closePath();
+    ctx.fill();
+
+    // Blade
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(200, 230, 255, ${a * 0.85})`;
+    ctx.lineWidth = 2.2 + w.active * 2.5;
+    ctx.beginPath();
+    ctx.moveTo(px, py);
+    ctx.lineTo(tipX, tipY);
+    ctx.stroke();
+
+    // Soft neon arc trail
+    ctx.strokeStyle = `rgba(69, 224, 255, ${a * 0.35})`;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(px, py, len * 0.98, angle - sweep * 0.8, angle + sweep * 0.8);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255, 110, 168, ${a * 0.18})`;
+    ctx.beginPath();
+    ctx.arc(px, py, len * 0.92, angle - sweep * 0.5, angle + sweep * 0.5);
+    ctx.stroke();
+  }
+
+  // Rain-beaded windshield vignette
+  const bead = ctx.createRadialGradient(W * 0.5, H * 0.35, H * 0.1, W * 0.5, H * 0.5, H * 0.85);
+  bead.addColorStop(0, "rgba(0,0,0,0)");
+  bead.addColorStop(0.65, "rgba(0,0,0,0)");
+  bead.addColorStop(1, `rgba(2, 6, 14, ${0.18 + wiperPulse * 0.12})`);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.fillStyle = bead;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.restore();
+}
+
 /**
  * Classic side-view highway + skyline strip — flat parallax, no vanish grid.
  */
@@ -5031,38 +5313,43 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
 }
 
 function drawNightDrive(now, bass, mid, air, peak, snare, hat, solo) {
+  const storm = vizMode === "rainDrive";
   updateCamera(now, bass, mid, air, peak, snare);
   applyWorldTransform();
 
-  drawSky(now, bass, mid);
-  drawStars(now, air, mid, solo, bass);
-  if (fxOn("harmonyConstellation")) drawHarmonyConstellation(bass, solo);
+  if (storm) drawStormSky(now, bass, mid);
+  else drawSky(now, bass, mid);
+  // Storm dims the starfield — clouds ate half the sky
+  drawStars(now, storm ? air * 0.45 : air, mid, storm ? solo * 0.55 : solo, bass);
+  if (fxOn("harmonyConstellation") && !storm) drawHarmonyConstellation(bass, solo);
   if (fxOn("shootingStars")) drawShootingStars(bass, solo);
-  if (fxOn("soloAurora")) drawSoloAurora(solo, air);
+  if (fxOn("soloAurora") && !storm) drawSoloAurora(solo, air);
   if (fxOn("cloudDeck")) drawCloudDeck(now);
   if (fxOn("melodyThread")) drawMelodyThread();
-  if (fxOn("sunPetals")) drawSunPetals(now, mid, solo);
-  drawSoftSun(bass, mid, solo);
+  if (fxOn("sunPetals") && !storm) drawSunPetals(now, mid, solo);
+  drawSoftSun(bass, mid, storm ? solo * 0.65 : solo);
   drawHeartbeatRing(bass, mid);
   drawUsPresence(bass, mid, air);
   if (fxOn("chordHalos")) drawChordHalos();
   if (fxOn("hammerRipples")) drawHammerRipples();
-  if (fxOn("shockRings")) drawShocks();
+  if (fxOn("shockRings") && !storm) drawShocks();
   if (fxOn("horizonRibbons")) drawHorizonRibbons(now, bass, mid, solo);
   drawHorizon(bass);
   if (fxOn("bassMountain")) drawBassMountain(bass);
-  if (fxOn("mirrorSea")) drawMirrorSea();
+  if (fxOn("mirrorSea") || storm) drawMirrorSea();
   drawSea(now, bass, mid, air);
+  if (storm) drawWetAsphalt(now, bass, mid, air);
   if (fxOn("quasarJets")) drawQuasarJets(now, bass, mid, solo);
-  if (fxOn("sunFlares")) drawSunFlares(now, peak, solo, bass);
-  if (fxOn("mistSheets")) drawMistSheets(now, mid);
-  if (fxOn("rain")) drawRain(mid);
-  if (fxOn("fog")) drawFog(now, bass);
-  if (fxOn("dew")) drawDew(now, air, mid);
+  if (fxOn("sunFlares") && !storm) drawSunFlares(now, peak, solo, bass);
+  if (fxOn("mistSheets") || storm) drawMistSheets(now, mid);
+  if (fxOn("rain") || storm) drawRain(mid);
+  if (fxOn("fog") || storm) drawFog(now, bass);
+  if (fxOn("dew") || storm) drawDew(now, air, mid);
   if (fxOn("sparks")) drawSparks(bass, solo);
   if (fxOn("streaks")) drawStreaks();
 
   resetScreenTransform();
+  if (storm) drawWipers();
 }
 
 function frame(now) {
@@ -5326,11 +5613,13 @@ filePick.addEventListener("click", (e) => e.stopPropagation());
 document.querySelectorAll("[data-viz]").forEach((btn) => {
   btn.addEventListener("click", () => {
     const mode = btn.getAttribute("data-viz");
-    if (mode === "skyline" || mode === "nightDrive") setVizMode(mode);
+    if (mode === "skyline" || mode === "nightDrive" || mode === "rainDrive") setVizMode(mode);
   });
 });
 vizSwitchBtn?.addEventListener("click", () => {
-  setVizMode(vizMode === "skyline" ? "nightDrive" : "skyline");
+  const i = VIZ_MODES.indexOf(vizMode);
+  const next = VIZ_MODES[(i < 0 ? 0 : i + 1) % VIZ_MODES.length];
+  setVizMode(next);
 });
 syncVizModeUi();
 
