@@ -43,6 +43,9 @@ let skylineDriveSmooth = 1.1;
 const skylineWinLits = [];
 const SKYLINE_WIN_MAX = 220;
 const SKYLINE_WIN_STEP_MS = 95;
+/** Rooftop party particles — kicks/snares throw confetti into the night. */
+const skylineParty = [];
+const SKYLINE_PARTY_MAX = 280;
 /** Spectrum bars driving Skyline building heights (left=bass → right=air). */
 const SKYLINE_EQ_N = 56;
 const skylineEq = new Float32Array(SKYLINE_EQ_N);
@@ -1910,8 +1913,10 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
                 : "cyan",
     };
     // Skyline: light building windows like Night Drive lights the sea grid
-    if (vizMode === "skyline") spawnSkylineWinCells(flockN, flockOpts);
-    else spawnGridCells(flockN, flockOpts);
+    if (vizMode === "skyline") {
+      spawnSkylineWinCells(flockN, flockOpts);
+      spawnSkylineParty(kind, flockOpts.strength);
+    } else spawnGridCells(flockN, flockOpts);
   };
 
   if (kickFire) {
@@ -2043,8 +2048,10 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
     if (heartbeats.length) heartbeats.length = 0;
     if (bloomRings.length) bloomRings.length = 0;
     if (skylineWinLits.length) skylineWinLits.length = 0;
+    if (skylineParty.length) skylineParty.length = 0;
   } else {
     updateSkylineWinLits(dt);
+    updateSkylineParty(dt);
     for (let i = gridCells.length - 1; i >= 0; i--) {
       const cell = gridCells[i];
       if (cell.traveling) {
@@ -3976,6 +3983,7 @@ function setVizMode(mode) {
     gridTrails.length = 0;
   } else {
     skylineWinLits.length = 0;
+    skylineParty.length = 0;
   }
   syncVizModeUi();
   if (statusEl && (started || playing)) {
@@ -4298,6 +4306,140 @@ function updateSkylineWinLits(dt) {
     }
     if (cell.life <= 0) skylineWinLits.splice(i, 1);
   }
+}
+
+/**
+ * Buildings throw a party — kicks/snares/hats burst confetti from rooftops.
+ */
+function spawnSkylineParty(kind, strength = 0.5) {
+  if (vizMode !== "skyline" || !fxOn("sparks") || !playing || !W) return;
+  const layerName = kind === "hat" ? (Math.random() > 0.4 ? "near" : "mid") : Math.random() > 0.28 ? "near" : "mid";
+  const buildings = skylineLayerByName(layerName);
+  if (!buildings.length) return;
+  const scrollMul = layerName === "near" ? 1.0 : layerName === "mid" ? 0.5 : 0.18;
+  const scroll = skylineScrollPx * scrollMul;
+  const loopW = buildings.loopW || W * 4;
+  const off = ((scroll % loopW) + loopW) % loopW;
+  const groundY = H * 0.62;
+  const candidates = [];
+  for (let bi = 0; bi < buildings.length; bi++) {
+    const b = buildings[bi];
+    for (let k = -1; k <= 1; k++) {
+      const x = b.x - off + k * loopW;
+      if (x + b.w < 8 || x > W - 8) continue;
+      candidates.push({ b, x });
+    }
+  }
+  if (!candidates.length) return;
+
+  const s = Math.min(1, Math.max(0.2, strength));
+  const nRoofs =
+    kind === "kick" ? 2 + Math.floor(s * 3) : kind === "snare" ? 1 + Math.floor(s * 2) : 1 + (Math.random() > 0.5 ? 1 : 0);
+  for (let r = 0; r < nRoofs; r++) {
+    const pick = candidates[(Math.random() * candidates.length) | 0];
+    let roofV = 0;
+    if (pick.b.masses) {
+      for (const m of pick.b.masses) {
+        if (!m.spire) roofV = Math.min(roofV, m.v0);
+      }
+    }
+    const top = groundY - pick.b.h;
+    const roofY = top + roofV * pick.b.h;
+    const cx = pick.x + pick.b.w * (0.25 + Math.random() * 0.5);
+    const palette = pick.b.palette;
+    const count =
+      kind === "kick"
+        ? 12 + Math.floor(s * 16)
+        : kind === "snare"
+          ? 9 + Math.floor(s * 12)
+          : 5 + Math.floor(s * 8);
+
+    for (let i = 0; i < count; i++) {
+      if (skylineParty.length >= SKYLINE_PARTY_MAX) {
+        skylineParty.splice(0, Math.min(16, count));
+      }
+      const spread = kind === "hat" ? 0.9 : kind === "snare" ? 1.5 : 2.1;
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * spread;
+      const speed =
+        (kind === "kick" ? 2.8 : kind === "snare" ? 2.2 : 1.6) + Math.random() * (2.5 + s * 2.5);
+      const hue =
+        Math.random() > 0.35 && palette
+          ? Math.random() > 0.5
+            ? palette.accent
+            : palette.glow
+          : SW_RAINBOW[(Math.random() * SW_RAINBOW.length) | 0];
+      skylineParty.push({
+        x: cx + (Math.random() - 0.5) * pick.b.w * 0.35,
+        y: roofY + Math.random() * 4,
+        vx: Math.cos(ang) * speed + (Math.random() - 0.5) * 1.2 - skylineDriveSmooth * 0.2,
+        vy: Math.sin(ang) * speed - 0.5 - Math.random() * 1.8,
+        life: 1,
+        decay: kind === "hat" ? 0.022 + Math.random() * 0.02 : 0.011 + Math.random() * 0.016,
+        r: kind === "kick" ? 1.6 + Math.random() * 3.4 : 1.0 + Math.random() * 2.4,
+        hue,
+        kind,
+        spin: (Math.random() - 0.5) * 0.55,
+        rot: Math.random() * Math.PI * 2,
+        grav: kind === "kick" ? 0.14 : kind === "snare" ? 0.1 : 0.07,
+        confetti: kind === "kick" || (kind === "snare" && Math.random() > 0.55),
+      });
+    }
+  }
+}
+
+function updateSkylineParty(dt) {
+  if (vizMode !== "skyline") {
+    if (skylineParty.length) skylineParty.length = 0;
+    return;
+  }
+  const t = dt / 16;
+  const drift = skylineDriveSmooth * 0.35 * t;
+  for (let i = skylineParty.length - 1; i >= 0; i--) {
+    const p = skylineParty[i];
+    p.vy += p.grav * t;
+    p.vx *= 0.995;
+    p.x += p.vx * t - drift;
+    p.y += p.vy * t;
+    p.rot += p.spin * t;
+    p.life -= p.decay * t;
+    if (p.life <= 0 || p.y > H + 30 || p.x < -40 || p.x > W + 40) {
+      skylineParty.splice(i, 1);
+    }
+  }
+}
+
+function drawSkylineParty() {
+  if (!skylineParty.length || !fxOn("sparks")) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const p of skylineParty) {
+    const a = Math.max(0, p.life);
+    if (a < 0.04) continue;
+    const [cr, cg, cb] = p.hue || [69, 224, 255];
+    if (p.confetti) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${a * 0.9})`;
+      const w = p.r * (0.9 + a * 0.5);
+      const h = p.r * 0.45;
+      ctx.fillRect(-w * 0.5, -h * 0.5, w, h);
+      ctx.restore();
+    } else {
+      // Spark streak
+      ctx.strokeStyle = `rgba(${cr}, ${cg}, ${cb}, ${a})`;
+      ctx.lineWidth = Math.max(1, p.r * 0.55);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 1.8, p.y - p.vy * 1.8);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(${cr}, ${cg}, ${cb}, ${a})`;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(0.8, p.r * 0.35), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 function seedSkylineCity() {
@@ -4688,6 +4830,9 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
     }
     ctx.restore();
   }
+
+  // Rooftop party — kicks spill into the night
+  drawSkylineParty();
 }
 
 function drawNightDrive(now, bass, mid, air, peak, snare, hat, solo) {
@@ -4943,6 +5088,10 @@ for (const input of document.querySelectorAll("#fx-panel input[data-fx]")) {
       gridCells.length = 0;
       gridTrails.length = 0;
       skylineWinLits.length = 0;
+    }
+    if (key === "sparks" && !input.checked) {
+      sparks.length = 0;
+      skylineParty.length = 0;
     }
     if (key === "constellationTrails" && !input.checked) gridTrails.length = 0;
     if (key === "vanishingMeteors" && !input.checked) meteors.length = 0;
