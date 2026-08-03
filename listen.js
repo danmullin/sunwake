@@ -4632,12 +4632,12 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = `rgba(255, 110, 168, ${0.05 + mid * 0.07})`;
   ctx.fillRect(0, roadTop + 3, W, 2);
 
-  // Lane dashes — close to near-layer pace (was 1.05; 0.55 felt too slow)
+  // Lane dashes — slightly ahead of near towers (1.0) so the road leads
   const laneY = roadTop + roadH * 0.42;
   const dashW = 32;
   const gap = 30;
   const period = dashW + gap;
-  const dashOff = ((scroll * 0.9) % period + period) % period;
+  const dashOff = ((scroll * 1.1) % period + period) % period;
   ctx.strokeStyle = `rgba(240, 197, 106, ${0.5 + peak * 0.4})`;
   ctx.lineWidth = 3;
   ctx.setLineDash([dashW, gap]);
