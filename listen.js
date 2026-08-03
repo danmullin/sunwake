@@ -4172,11 +4172,16 @@ function seedSkylineCity() {
           }
         }
       }
-      arr.push({ x, w, h, windows, hue: Math.random(), cols, rows });
+      arr.push({ x, w, h, windows, hue: Math.random(), cols, rows, eqT: 0 });
       x += w + gap;
     }
     // Exact loop period = end of last building (no extra pad — pad caused a dead gap hitch)
     arr.loopW = Math.max(x, W + 1);
+    // Stable spectrum slots along the strip — not screen-x (that only woke the left edge)
+    const n = arr.length;
+    for (let i = 0; i < n; i++) {
+      arr[i].eqT = n <= 1 ? 0.5 : i / (n - 1);
+    }
   };
   fill(skylineFar, H * 0.08, H * 0.22, 28, 70);
   fill(skylineMid, H * 0.14, H * 0.34, 36, 90);
@@ -4199,8 +4204,10 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
     for (let k = -1; k <= 1; k++) {
       const x = b.x - off + k * loopW;
       if (x + b.w < -4 || x > W + 4) continue;
-      // Screen-x samples the EQ (bass left → air right) — city becomes the analyzer
-      const eq = sampleSkylineEq((x + b.w * 0.5) / Math.max(1, W));
+      // Per-building band + shared punch — reacts anywhere on screen, not only far-left bass
+      const band = sampleSkylineEq(b.eqT != null ? b.eqT : 0.5);
+      const shared = Math.min(1, bass * 0.55 + mid * 0.28 + peak * 0.22 + drive * 0.18);
+      const eq = Math.min(1, band * 0.5 + shared * 0.58 + band * shared * 0.12);
       const hMul = 0.32 + eq * (0.95 + drive * 0.25) * eqAmp;
       const liveH = Math.max(4, b.h * hMul + bob * (0.35 + b.hue * 0.4));
       // Base stays planted on groundY — roof rides the spectrum
