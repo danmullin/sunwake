@@ -99,7 +99,12 @@ while (i < bootLinesRaw.length) {
   i++;
 }
 
-const head = [...headLines, "", ...liftedFns].join(nl);
+let head = [...headLines, "", ...liftedFns].join(nl);
+// Module lives under lib/ — stamp file stays at site root
+head = head.replace(
+  'new URL("./version.json", import.meta.url)',
+  'new URL("../version.json", import.meta.url)'
+);
 const boot = bootLines.join(nl);
 
 fs.mkdirSync(path.join(root, "lib", "scenes"), { recursive: true });
