@@ -1,0 +1,17 @@
+Split runtime.js monolith into real ES modules (slices 1-6)
+
+runtime.js: 5800 lines to 458 lines (92% reduction). All logic now lives
+in purpose-built modules with clean import graphs and no circular deps.
+
+New modules:
+- lib/simulation.js (2840 lines) — all world/particle/draw helpers + updateFx
+- lib/scenes/skyline.js (992), arcade.js (489), rainDrive.js (274),
+  tunnel.js (195), nightDrive.js (58) — scene drawing per scene file
+- lib/renderer.js (92) — frame() loop, routes to scene draw/update
+- lib/audio.js (310) — Web Audio graph, file/system capture, playback
+- lib/fxConfig.js (51), lib/vizMode.js (106) — real implementations
+- lib/ui.js (110), lib/input.js (77) — chrome + keyboard/DnD handlers
+- lib/state.js (348) — all shared mutable state (from prior session)
+- lib/camera.js, sun.js, math.js, perf.js — extracted in prior session
+
+Guard: node _check-public.js OK. All 19 lib files syntax-clean.
