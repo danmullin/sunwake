@@ -1,6 +1,6 @@
 # Sunwake
 
-Synthwave audio visualizer — a night-drive sea of light that reacts to your music, a stormy **Rain Drive** cousin, plus a classic side-view **Skyline** highway strip.
+Synthwave audio visualizer — a night-drive sea of light that reacts to your music, plus storm, tunnel, arcade, and skyline scenes.
 
 **Live:** https://danmullin.github.io/sunwake/
 
@@ -10,9 +10,11 @@ Synthwave audio visualizer — a night-drive sea of light that reacts to your mu
 |------|------|
 | **Night Drive** (default) | Perspective grid sea, camera sway, full Effects panel |
 | **Rain Drive** | Same highway in a storm — cloudy overcast, wet asphalt, denser rain, lightning bolts on drums |
+| **Tunnel** | Repeating rib lights racing past; bass = pulse rings on the walls |
+| **Arcade** | CRT bezel, scanlines, vector starfield, EQ as coin-op chrome |
 | **Skyline** | Flat side-view skyline + highway strip (parallax buildings, lane dashes) |
 
-Pick on the gate before you listen, or cycle from the chrome button while playing. Preference is saved in the browser. Skyline is web-first; mobile bake comes later when it feels ready.
+Pick on the gate before you listen, or cycle from the chrome button while playing. Preference is saved in the browser. Skyline / Tunnel / Arcade are web-first; mobile bake comes later when they feel ready.
 
 ## Run
 
@@ -27,11 +29,11 @@ Or open `index.html` via any static file server (modules need HTTP, not `file://
 
 ## Listen
 
-1. Choose **Night Drive**, **Rain Drive**, or **Skyline**
+1. Choose a scene on the gate (**Night Drive**, **Rain Drive**, **Tunnel**, **Arcade**, or **Skyline**)
 2. **Open a song** — pick a local audio file, or drag one onto the page
 3. **Listen to system audio** — Chrome or Edge → Entire screen → check **Share system audio** (Spotify, YouTube, etc.)
 4. **Hide UI** (`H`) for a clean full-screen view
-5. **Effects** panel (`F`) — Night Drive / Rain Drive toggles; drag the title bar to move it (hidden in Skyline)
+5. **Effects** panel (`F`) — Night Drive / Rain Drive toggles; drag the title bar to move it (hidden in Tunnel / Arcade / Skyline)
 
 ## Tips
 
@@ -48,7 +50,3 @@ node _stamp-version.js   # optional local: date + git SHA into version.json
 Must exit 0 on the public guard before push. CI stamps `version.json` and blocks Pages deploy if the guard fails.
 
 **Versioning:** hand-edit `codename` in `version.json` when a chapter starts (current: **Quasar**). CI fills `date` + short `sha`. UI shows `Quasar · abc1234` bottom-left; full stamp logs to the console on boot.
-
-## License
-
-MIT
