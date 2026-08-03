@@ -39,6 +39,10 @@ let skylineKickBob = 0;
 let skylineScrollPx = 0;
 /** Smoothed scroll rate — avoids bass spikes hitching the strip. */
 let skylineDriveSmooth = 0.8;
+/** Lit window flocks — Skyline's answer to Night Drive grid cells. */
+const skylineWinLits = [];
+const SKYLINE_WIN_MAX = 220;
+const SKYLINE_WIN_STEP_MS = 95;
 
 let W = 0;
 let H = 0;
@@ -1885,7 +1889,7 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
       kind === "hat"
         ? Math.max(4, Math.floor(4 + energy * 6))
         : Math.max(6, Math.floor(6 + energy * 9));
-    spawnGridCells(flockN, {
+    const flockOpts = {
       strength: kind === "hat" ? 0.3 + energy * 0.35 : 0.42 + energy * 0.4,
       hue:
         kind === "hat"
@@ -1901,7 +1905,10 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
               : Math.random() > 0.5
                 ? "pink"
                 : "cyan",
-    });
+    };
+    // Skyline: light building windows like Night Drive lights the sea grid
+    if (vizMode === "skyline") spawnSkylineWinCells(flockN, flockOpts);
+    else spawnGridCells(flockN, flockOpts);
   };
 
   if (kickFire) {
@@ -2032,7 +2039,9 @@ function updateFx(bass, mid, air, now, peak = 0, snare = 0, hat = 0, leadPitch =
     if (mirrorCells.length) mirrorCells.length = 0;
     if (heartbeats.length) heartbeats.length = 0;
     if (bloomRings.length) bloomRings.length = 0;
+    if (skylineWinLits.length) skylineWinLits.length = 0;
   } else {
+    updateSkylineWinLits(dt);
     for (let i = gridCells.length - 1; i >= 0; i--) {
       const cell = gridCells[i];
       if (cell.traveling) {
@@ -3958,9 +3967,137 @@ function setVizMode(mode) {
   } catch {
     /* ignore */
   }
+  // Drop mode-specific lit cells so they don't linger across switches
+  if (vizMode === "skyline") {
+    gridCells.length = 0;
+    gridTrails.length = 0;
+  } else {
+    skylineWinLits.length = 0;
+  }
   syncVizModeUi();
   if (statusEl && (started || playing)) {
     statusEl.textContent = vizMode === "skyline" ? "skyline" : "night drive";
+  }
+}
+
+function skylineWinFill(hue, a) {
+  if (hue === "gold") return `rgba(240, 197, 106, ${a})`;
+  if (hue === "pink") return `rgba(255, 110, 168, ${a})`;
+  return `rgba(69, 224, 255, ${a})`;
+}
+
+function skylineLayerByName(name) {
+  if (name === "near") return skylineNear;
+  if (name === "mid") return skylineMid;
+  return skylineFar;
+}
+
+/** Drum flocks for Skyline — windows hop roofward like grid cells hop sunward. */
+function spawnSkylineWinFlock(size, { hue, strength, layerName } = {}) {
+  if (!fxOn("litFlocks") || size <= 0 || !playing) return;
+  const layer = layerName || (Math.random() > 0.35 ? "near" : "mid");
+  const buildings = skylineLayerByName(layer);
+  if (!buildings.length) return;
+  const bi = Math.floor(Math.random() * buildings.length);
+  const b = buildings[bi];
+  const rows = b.rows || 4;
+  const cols = b.cols || 3;
+  let r = Math.floor(rows * (0.45 + Math.random() * 0.45)); // start mid/low
+  let c = Math.floor(Math.random() * cols);
+  const flockHue = hue || (Math.random() > 0.55 ? "cyan" : Math.random() > 0.45 ? "pink" : "gold");
+  const base = strength ?? 0.35 + Math.random() * 0.2;
+  const centerR = r;
+  const centerC = c;
+
+  for (let k = 0; k < size; k++) {
+    if (skylineWinLits.length >= SKYLINE_WIN_MAX) {
+      skylineWinLits.splice(0, Math.min(12, Math.ceil(size * 0.5)));
+    }
+    if (k > 0) {
+      if (Math.random() < 0.4) {
+        r = centerR + Math.round((Math.random() - 0.5) * 2);
+        c = centerC + Math.round((Math.random() - 0.5) * 2);
+      } else {
+        r += Math.random() < 0.7 ? (Math.random() < 0.35 ? -1 : 1) : 0;
+        c += Math.random() < 0.8 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+      }
+      r = Math.max(0, Math.min(rows - 1, r));
+      c = Math.max(0, Math.min(cols - 1, c));
+    }
+    const dist = Math.abs(r - centerR) + Math.abs(c - centerC);
+    skylineWinLits.push({
+      layer,
+      bi,
+      r,
+      c,
+      life: 1 - Math.min(0.25, dist * 0.06),
+      decay: 0.004 + Math.random() * 0.004,
+      hue: flockHue,
+      strength: Math.max(0.22, base * (1 - dist * 0.08)),
+      traveling: true,
+      stepAcc: Math.random() * SKYLINE_WIN_STEP_MS,
+      stepMs: SKYLINE_WIN_STEP_MS * (0.85 + Math.random() * 0.3),
+    });
+  }
+}
+
+function spawnSkylineWinCells(n, opts = {}) {
+  if (!fxOn("litFlocks") || n <= 0 || !playing) return;
+  const flockSize = Math.max(5, Math.min(14, n));
+  spawnSkylineWinFlock(flockSize, opts);
+  const extras = 1 + (n >= 6 ? 1 : 0);
+  for (let i = 0; i < extras; i++) {
+    spawnSkylineWinFlock(4 + Math.floor(Math.random() * 6), {
+      ...opts,
+      layerName: Math.random() > 0.4 ? "near" : "mid",
+    });
+  }
+}
+
+function stepSkylineWinLit(cell) {
+  const buildings = skylineLayerByName(cell.layer);
+  const b = buildings[cell.bi];
+  if (!b) {
+    cell.traveling = false;
+    cell.decay = 0.08;
+    return;
+  }
+  const rows = b.rows || 4;
+  const cols = b.cols || 3;
+  if (cell.r > 0) {
+    cell.r -= 1; // climb toward the roof / sun
+    if (Math.random() < 0.35) {
+      cell.c += Math.random() < 0.5 ? -1 : 1;
+      cell.c = Math.max(0, Math.min(cols - 1, cell.c));
+    }
+    cell.life = Math.min(1, cell.life + 0.06);
+  } else {
+    cell.traveling = false;
+    cell.r = 0;
+    cell.decay = 0.06 + Math.random() * 0.04;
+    cell.strength *= 1.3;
+  }
+  cell.r = Math.max(0, Math.min(rows - 1, cell.r));
+}
+
+function updateSkylineWinLits(dt) {
+  if (vizMode !== "skyline") {
+    if (skylineWinLits.length) skylineWinLits.length = 0;
+    return;
+  }
+  for (let i = skylineWinLits.length - 1; i >= 0; i--) {
+    const cell = skylineWinLits[i];
+    if (cell.traveling) {
+      cell.stepAcc = (cell.stepAcc || 0) + dt;
+      while (cell.traveling && cell.stepAcc >= cell.stepMs) {
+        cell.stepAcc -= cell.stepMs;
+        stepSkylineWinLit(cell);
+      }
+      cell.life -= cell.decay * (dt / 16);
+    } else {
+      cell.life -= cell.decay * (dt / 16) * 2.2;
+    }
+    if (cell.life <= 0) skylineWinLits.splice(i, 1);
   }
 }
 
@@ -3976,20 +4113,26 @@ function seedSkylineCity() {
       const h = minH + Math.random() * (maxH - minH);
       const gap = 3 + Math.random() * 14;
       const windows = [];
-      const cols = Math.max(2, Math.floor(w / 10));
-      const rows = Math.max(2, Math.floor(h / 12));
+      const cols = Math.max(2, Math.floor(w / 9));
+      const rows = Math.max(3, Math.floor(h / 11));
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
-          if (Math.random() > 0.55) {
+          // Denser than before — reads as a lit grid when music hits
+          if (Math.random() > 0.32) {
+            const v = (r + 0.35) / rows;
             windows.push({
               u: (c + 0.35) / cols,
-              v: (r + 0.35) / rows,
+              v,
+              r,
+              c,
               phase: Math.random() * Math.PI * 2,
+              // Prefer bass near street, air near roof
+              band: v > 0.62 ? "bass" : v < 0.35 ? "air" : "mid",
             });
           }
         }
       }
-      arr.push({ x, w, h, windows, hue: Math.random() });
+      arr.push({ x, w, h, windows, hue: Math.random(), cols, rows });
       x += w + gap;
     }
     // Exact loop period = end of last building (no extra pad — pad caused a dead gap hitch)
@@ -3998,14 +4141,18 @@ function seedSkylineCity() {
   fill(skylineFar, H * 0.08, H * 0.22, 28, 70);
   fill(skylineMid, H * 0.14, H * 0.34, 36, 90);
   fill(skylineNear, H * 0.2, H * 0.42, 44, 110);
+  skylineWinLits.length = 0;
 }
 
-function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, mid, air, now) {
+function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, bass, mid, air, peak, snare, now, layerName) {
   if (!buildings.length) return;
   const loopW = buildings.loopW || W * 4;
   const off = ((scroll % loopW) + loopW) % loopW;
+  const musicHot = playing && (bass + mid + air + peak) * 0.25 > 0.06;
+  const drive = FX.gridDrive || 0;
   ctx.save();
-  for (const b of buildings) {
+  for (let bi = 0; bi < buildings.length; bi++) {
+    const b = buildings[bi];
     // Tile ±1 period so buildings straddling the wrap stay continuous
     for (let k = -1; k <= 1; k++) {
       const x = b.x - off + k * loopW;
@@ -4018,18 +4165,57 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, m
       ctx.fillRect(x, top, b.w, bh);
       ctx.fillStyle = `rgba(255, 110, 168, ${0.08 + air * 0.12})`;
       ctx.fillRect(x, top, b.w, 2);
+
       if (drawWindows && b.windows) {
+        const winW = Math.max(2, (b.w / (b.cols || 4)) * 0.55);
+        const winH = Math.max(2, (bh / (b.rows || 4)) * 0.45);
         ctx.globalCompositeOperation = "lighter";
+
+        // Ambient grid — band by floor, like Night Drive sea rows answering bass/mid/air
         for (const win of b.windows) {
+          const band =
+            win.band === "bass"
+              ? bass * 1.15 + peak * 0.35
+              : win.band === "air"
+                ? air * 1.2 + mid * 0.35
+                : mid * 1.1 + snare * 0.55;
           const tw =
-            0.35 +
-            0.65 * (0.5 + 0.5 * Math.sin(now * 0.002 + win.phase + mid * 3));
-          const a = (0.15 + air * 0.55 + mid * 0.25) * tw;
-          if (a < 0.08) continue;
+            0.2 +
+            0.8 *
+              (0.5 +
+                0.5 *
+                  Math.sin(now * 0.0022 + win.phase + mid * 2.5 + bass * 1.5));
+          const kickFlash = win.band === "bass" ? bass * 0.55 : 0;
+          const a =
+            (0.06 + band * 0.7 + drive * 0.35 + kickFlash) *
+            tw *
+            (musicHot ? 1 : 0.45) *
+            alpha;
+          if (a < 0.05) continue;
+          const hue =
+            win.band === "bass" ? "gold" : win.band === "air" ? "cyan" : "pink";
           const wx = x + win.u * b.w;
           const wy = top + win.v * bh;
-          ctx.fillStyle = `rgba(255, 210, 140, ${a})`;
-          ctx.fillRect(wx, wy, Math.max(2, b.w * 0.08), Math.max(2, bh * 0.06));
+          ctx.fillStyle = skylineWinFill(hue, Math.min(0.95, a));
+          ctx.fillRect(wx, wy, winW, winH);
+        }
+
+        // Lit flocks climbing this building
+        if (fxOn("litFlocks") && layerName) {
+          for (const cell of skylineWinLits) {
+            if (cell.layer !== layerName || cell.bi !== bi) continue;
+            const a = cell.life * cell.strength * (0.7 + drive * 0.5) * alpha;
+            if (a < 0.04) continue;
+            const cols = b.cols || 4;
+            const rows = b.rows || 4;
+            const wx = x + ((cell.c + 0.35) / cols) * b.w;
+            const wy = top + ((cell.r + 0.35) / rows) * bh;
+            ctx.fillStyle = skylineWinFill(cell.hue, Math.min(1, a));
+            ctx.fillRect(wx - 0.5, wy - 0.5, winW + 1, winH + 1);
+            // Soft halo so flocks read like lit grid squares
+            ctx.fillStyle = skylineWinFill(cell.hue, Math.min(0.45, a * 0.35));
+            ctx.fillRect(wx - 2, wy - 2, winW + 4, winH + 4);
+          }
         }
       }
     }
@@ -4107,9 +4293,9 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillRect(0, groundY - 18, W, 28);
 
   // Buildings after sun so they clip the lower disc (peek effect)
-  drawSkylineLayer(skylineFar, scroll * 0.22, groundY, bob * 0.25, 0.55, false, mid, air, now);
-  drawSkylineLayer(skylineMid, scroll * 0.5, groundY, bob * 0.45, 0.72, true, mid, air, now);
-  drawSkylineLayer(skylineNear, scroll * 0.88, groundY, bob * 0.7, 0.92, true, mid, air, now);
+  drawSkylineLayer(skylineFar, scroll * 0.22, groundY, bob * 0.25, 0.55, false, bass, mid, air, peak, snare, now, "far");
+  drawSkylineLayer(skylineMid, scroll * 0.5, groundY, bob * 0.45, 0.72, true, bass, mid, air, peak, snare, now, "mid");
+  drawSkylineLayer(skylineNear, scroll * 0.88, groundY, bob * 0.7, 0.92, true, bass, mid, air, peak, snare, now, "near");
 
   // Highway band
   const roadH = H - roadTop;
@@ -4435,6 +4621,7 @@ for (const input of document.querySelectorAll("#fx-panel input[data-fx]")) {
     if (key === "litFlocks" && !input.checked) {
       gridCells.length = 0;
       gridTrails.length = 0;
+      skylineWinLits.length = 0;
     }
     if (key === "constellationTrails" && !input.checked) gridTrails.length = 0;
     if (key === "vanishingMeteors" && !input.checked) meteors.length = 0;
