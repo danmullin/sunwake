@@ -4326,7 +4326,7 @@ function seedSkylineCity() {
   skylineWinLits.length = 0;
 }
 
-function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, bass, mid, air, peak, snare, now, layerName) {
+function drawSkylineLayer(buildings, scroll, groundY, alpha, drawWindows, bass, mid, air, peak, snare, now, layerName) {
   if (!buildings.length) return;
   const loopW = buildings.loopW || W * 4;
   const off = ((scroll % loopW) + loopW) % loopW;
@@ -4341,13 +4341,11 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, b
     for (let k = -1; k <= 1; k++) {
       const x = b.x - off + k * loopW;
       if (x + b.w < -4 || x > W + 4) continue;
-      // Per-building band + shared punch — reacts anywhere on screen, not only far-left bass
+      // Fixed silhouette — fractal masses stay put; EQ lights roofs/windows instead of stretching
       const bandEq = sampleSkylineEq(b.eqT != null ? b.eqT : 0.5);
       const shared = Math.min(1, bass * 0.55 + mid * 0.28 + peak * 0.22 + drive * 0.18);
       const eq = Math.min(1, bandEq * 0.5 + shared * 0.58 + bandEq * shared * 0.12);
-      const hMul = 0.32 + eq * (0.95 + drive * 0.25) * eqAmp;
-      const liveH = Math.max(4, b.h * hMul + bob * (0.35 + b.hue * 0.4));
-      // Base stays planted on groundY — roof rides the spectrum
+      const liveH = b.h;
       const top = groundY - liveH;
       const bh = liveH;
       const pal = b.palette || {
@@ -4495,7 +4493,7 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   const groundY = roadTop;
   // Tallest near-layer roofs (~0.42H) — sun peeks over, not fully above
   const tallRoofY = groundY - H * 0.42;
-  // Soft kick bob only — EQ owns the big vertical motion
+  // Soft kick bob — road / dashes only (buildings stay fixed height)
   skylineKickBob = smooth(skylineKickBob, bass * 5 + snare * 2, 0.22);
   const bob = skylineKickBob;
   // Faster than the first cruise, calmer than full warp
@@ -4557,9 +4555,9 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillRect(0, groundY - 18, W, 28);
 
   // Parallax — near faster than far, without the warp-speed scream
-  drawSkylineLayer(skylineFar, scroll * 0.18, groundY, bob * 0.25, 0.55, false, bass, mid, air, peak, snare, now, "far");
-  drawSkylineLayer(skylineMid, scroll * 0.5, groundY, bob * 0.45, 0.72, true, bass, mid, air, peak, snare, now, "mid");
-  drawSkylineLayer(skylineNear, scroll * 1.0, groundY, bob * 0.7, 0.92, true, bass, mid, air, peak, snare, now, "near");
+  drawSkylineLayer(skylineFar, scroll * 0.18, groundY, 0.55, false, bass, mid, air, peak, snare, now, "far");
+  drawSkylineLayer(skylineMid, scroll * 0.5, groundY, 0.72, true, bass, mid, air, peak, snare, now, "mid");
+  drawSkylineLayer(skylineNear, scroll * 1.0, groundY, 0.92, true, bass, mid, air, peak, snare, now, "near");
 
   // Highway band
   const roadH = H - roadTop;
