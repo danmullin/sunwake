@@ -141,7 +141,7 @@ body {
 
 .viz-mode-picker {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 0.35rem;
   margin: 0 0 1rem;
 }
