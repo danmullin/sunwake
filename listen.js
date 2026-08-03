@@ -4699,7 +4699,7 @@ function drawSkylineLayer(buildings, scroll, groundY, alpha, drawWindows, bass, 
 }
 
 /**
- * Golden-hour Skyline sun — warm wake, soft rays, music-reactive glow.
+ * Skyline sun — wake, rays, kick rings, flare, music-reactive corona.
  */
 function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   const pulse = fxOn("sunPulse");
@@ -4710,17 +4710,17 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   const breath = 0.5 + 0.5 * Math.sin(now * 0.0012);
   const heat = Math.min(1, bass * 0.85 + peak * 0.55 + solo * 0.35);
 
-  // Sky cast — honey light washing toward the city
+  // Sky cast — sun bruises the atmosphere toward the city
   ctx.save();
   const cast = ctx.createRadialGradient(sunX, sunY, sunR * 0.5, sunX, sunY, Math.max(W, H) * 0.75);
-  cast.addColorStop(0, `rgba(255, 180, 90, ${0.1 + heat * 0.12})`);
-  cast.addColorStop(0.35, `rgba(255, 140, 100, ${0.05 + mid * 0.05})`);
-  cast.addColorStop(1, "rgba(20, 16, 28, 0)");
+  cast.addColorStop(0, `rgba(180, 40, 55, ${0.08 + heat * 0.12})`);
+  cast.addColorStop(0.35, `rgba(90, 20, 50, ${0.05 + mid * 0.06})`);
+  cast.addColorStop(1, "rgba(10, 8, 20, 0)");
   ctx.fillStyle = cast;
   ctx.fillRect(0, 0, W, tallRoofY + sunR * 4);
   ctx.restore();
 
-  // Cloud wake — soft golden haze streaming LEFT (sun following the drive)
+  // Cloud wake — streams off the LEFT so the sun feels like it's following us
   ctx.save();
   for (let i = 0; i < 7; i++) {
     const t = i / 6;
@@ -4730,11 +4730,11 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     const ww = sunR * (2.6 + t * 6 + heat * 0.8);
     const wh = sunR * (0.5 + (1 - t) * 0.6);
     const wake = ctx.createRadialGradient(wx, wy, 0, wx, wy, ww);
-    const a0 = (0.14 - t * 0.018) * (0.7 + mid * 0.3 + heat * 0.15);
-    wake.addColorStop(0, `rgba(255, 190, 120, ${a0 * 0.55})`);
-    wake.addColorStop(0.35, `rgba(220, 140, 90, ${a0 * 0.4})`);
-    wake.addColorStop(0.7, `rgba(120, 70, 60, ${a0 * 0.2})`);
-    wake.addColorStop(1, "rgba(20, 14, 24, 0)");
+    const a0 = (0.18 - t * 0.02) * (0.7 + mid * 0.3 + heat * 0.15);
+    wake.addColorStop(0, `rgba(28, 12, 36, ${a0})`);
+    wake.addColorStop(0.35, `rgba(70, 22, 48, ${a0 * 0.55})`);
+    wake.addColorStop(0.7, `rgba(40, 18, 55, ${a0 * 0.22})`);
+    wake.addColorStop(1, "rgba(10, 8, 20, 0)");
     ctx.fillStyle = wake;
     ctx.beginPath();
     ctx.ellipse(wx, wy, ww, wh, 0.06 - i * 0.015, 0, Math.PI * 2);
@@ -4746,9 +4746,9 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     const lx = sunX - sunR * (0.85 + t * 1.8);
     const ly = sunY + Math.sin(now * 0.0005 + i) * sunR * 0.12;
     const lip = ctx.createRadialGradient(lx, ly, 0, lx, ly, sunR * (1.2 + t));
-    lip.addColorStop(0, `rgba(255, 220, 150, ${(0.1 + heat * 0.08) - t * 0.025})`);
-    lip.addColorStop(0.5, `rgba(255, 170, 100, ${0.05 - t * 0.012})`);
-    lip.addColorStop(1, "rgba(255, 140, 80, 0)");
+    lip.addColorStop(0, `rgba(255, 90, 110, ${(0.08 + heat * 0.06) - t * 0.02})`);
+    lip.addColorStop(0.5, `rgba(180, 60, 100, ${0.045 - t * 0.01})`);
+    lip.addColorStop(1, "rgba(80, 30, 60, 0)");
     ctx.fillStyle = lip;
     ctx.beginPath();
     ctx.ellipse(lx, ly, sunR * (1.4 + t * 1.2), sunR * 0.35, 0.1, 0, Math.PI * 2);
@@ -4756,7 +4756,7 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   }
   ctx.restore();
 
-  // Soft golden god-rays
+  // Long god-rays — slow spin, thicken on bass
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const rayN = 10;
@@ -4766,9 +4766,9 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     const flicker = 0.55 + 0.45 * Math.sin(now * 0.002 + i * 1.7);
     const len = sunR * (3.5 + heat * 2.5 + breath * 0.8) * (0.7 + (i % 3) * 0.2);
     const half = (0.035 + bass * 0.04 + peak * 0.02) * flicker;
-    const a = (0.035 + heat * 0.08) * flicker;
+    const a = (0.03 + heat * 0.07) * flicker;
     ctx.fillStyle =
-      i % 2 === 0 ? `rgba(255, 200, 110, ${a})` : `rgba(255, 170, 90, ${a * 0.85})`;
+      i % 2 === 0 ? `rgba(255, 120, 80, ${a})` : `rgba(255, 70, 110, ${a * 0.85})`;
     ctx.beginPath();
     ctx.moveTo(sunX, sunY);
     ctx.lineTo(sunX + Math.cos(ang - half) * len, sunY + Math.sin(ang - half) * len);
@@ -4778,7 +4778,7 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   }
   ctx.restore();
 
-  // Kick / peak shock rings — warm gold / soft peach
+  // Kick / peak shock rings
   if (bass > 0.28 || peak > 0.22 || snare > 0.35) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -4786,8 +4786,8 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     for (let i = 0; i < rings; i++) {
       const phase = (now * 0.003 + i * 0.45) % 1;
       const rr = sunR * (1.15 + phase * (2.8 + bass * 1.5));
-      const ra = (1 - phase) * (0.16 + bass * 0.2 + snare * 0.1);
-      ctx.strokeStyle = i % 2 ? `rgba(255, 190, 120, ${ra})` : `rgba(255, 220, 160, ${ra})`;
+      const ra = (1 - phase) * (0.18 + bass * 0.22 + snare * 0.12);
+      ctx.strokeStyle = i % 2 ? `rgba(255, 110, 168, ${ra})` : `rgba(255, 160, 90, ${ra})`;
       ctx.lineWidth = 1.5 + (1 - phase) * 2.5;
       ctx.beginPath();
       ctx.arc(sunX, sunY, rr, 0, Math.PI * 2);
@@ -4796,62 +4796,62 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     ctx.restore();
   }
 
-  // Anamorphic flare — honey streak
+  // Anamorphic flare streak on hits
   if (peak > 0.18 || snare > 0.3 || bass > 0.4) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const fa = 0.08 + peak * 0.22 + snare * 0.12 + bass * 0.08;
     const flare = ctx.createLinearGradient(sunX - sunR * 6, sunY, sunX + sunR * 5, sunY);
-    flare.addColorStop(0, "rgba(255, 160, 80, 0)");
-    flare.addColorStop(0.45, `rgba(255, 200, 120, ${fa * 0.55})`);
-    flare.addColorStop(0.5, `rgba(255, 245, 210, ${fa})`);
-    flare.addColorStop(0.55, `rgba(255, 180, 100, ${fa * 0.5})`);
-    flare.addColorStop(1, "rgba(200, 120, 60, 0)");
+    flare.addColorStop(0, "rgba(255, 100, 80, 0)");
+    flare.addColorStop(0.45, `rgba(255, 180, 120, ${fa * 0.55})`);
+    flare.addColorStop(0.5, `rgba(255, 240, 200, ${fa})`);
+    flare.addColorStop(0.55, `rgba(255, 110, 160, ${fa * 0.5})`);
+    flare.addColorStop(1, "rgba(120, 40, 80, 0)");
     ctx.fillStyle = flare;
     ctx.fillRect(sunX - sunR * 6, sunY - 1.5 - peak * 2, sunR * 11, 3 + peak * 4);
     ctx.restore();
   }
 
-  // Warm corona
+  // Bruised corona
   const glowR = sunR * (3.8 + heat * 1.2);
   const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, glowR);
-  sunGlow.addColorStop(0, `rgba(255, 220, 150, ${0.38 + heat * 0.28})`);
-  sunGlow.addColorStop(0.25, `rgba(255, 170, 90, ${0.22 + mid * 0.12})`);
-  sunGlow.addColorStop(0.55, `rgba(255, 130, 80, ${0.1 + solo * 0.08})`);
-  sunGlow.addColorStop(1, "rgba(40, 24, 20, 0)");
+  sunGlow.addColorStop(0, `rgba(255, 160, 90, ${0.32 + heat * 0.28})`);
+  sunGlow.addColorStop(0.22, `rgba(220, 55, 75, ${0.22 + mid * 0.14})`);
+  sunGlow.addColorStop(0.5, `rgba(100, 25, 70, ${0.14 + solo * 0.1})`);
+  sunGlow.addColorStop(1, "rgba(20, 10, 30, 0)");
   ctx.fillStyle = sunGlow;
   ctx.beginPath();
   ctx.arc(sunX, sunY, glowR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Soft gold halo rings
+  // Inner halo ring
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = `rgba(255, 210, 140, ${0.14 + heat * 0.18 + breath * 0.06})`;
+  ctx.strokeStyle = `rgba(255, 140, 100, ${0.12 + heat * 0.2 + breath * 0.06})`;
   ctx.lineWidth = 2 + bass * 3;
   ctx.beginPath();
   ctx.arc(sunX, sunY, sunR * (1.25 + bass * 0.15), 0, Math.PI * 2);
   ctx.stroke();
-  ctx.strokeStyle = `rgba(255, 180, 100, ${0.08 + snare * 0.12})`;
+  ctx.strokeStyle = `rgba(255, 80, 130, ${0.08 + snare * 0.15})`;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.arc(sunX, sunY, sunR * (1.55 + peak * 0.2), 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
-  // Disk — cream core → gold → soft apricot rim
+  // Disk — deep ember core, blood rim; core brightens on kick
   const coreBoost = 0.15 + bass * 0.35 + peak * 0.2;
   const sunDisk = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
-  sunDisk.addColorStop(0, `rgb(255, ${235 + coreBoost * 20}, ${190 + coreBoost * 30})`);
-  sunDisk.addColorStop(0.35, "#ffc878");
-  sunDisk.addColorStop(0.7, "#ff9a4a");
-  sunDisk.addColorStop(1, "#e87840");
+  sunDisk.addColorStop(0, `rgb(${255}, ${224 + coreBoost * 30}, ${168 + coreBoost * 40})`);
+  sunDisk.addColorStop(0.3, "#ff8a4a");
+  sunDisk.addColorStop(0.65, "#e04560");
+  sunDisk.addColorStop(1, "#6a1840");
   ctx.fillStyle = sunDisk;
   ctx.beginPath();
   ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Soft face shimmer
+  // Hot speckles on the face (subtle turbulence)
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   ctx.beginPath();
@@ -4862,7 +4862,7 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
     const pr = sunR * (0.15 + (i % 5) * 0.12);
     const px = sunX + Math.cos(a + i) * pr * (0.4 + 0.5 * Math.sin(now * 0.001 + i));
     const py = sunY + Math.sin(a * 1.3 + i) * pr * 0.55;
-    ctx.fillStyle = `rgba(255, 240, 200, ${0.05 + heat * 0.06})`;
+    ctx.fillStyle = `rgba(255, 220, 160, ${0.04 + heat * 0.06})`;
     ctx.beginPath();
     ctx.arc(px, py, 1.5 + (i % 3), 0, Math.PI * 2);
     ctx.fill();
@@ -4891,12 +4891,11 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * SKYLINE_SCROLL_RATE;
   const scroll = skylineScrollPx;
 
-  // Sky down to the road line — soft golden-hour wash
+  // Sky down to the road line
   const g = ctx.createLinearGradient(0, 0, 0, groundY);
-  g.addColorStop(0, "#060910");
-  g.addColorStop(0.45, `rgb(${14 + bass * 18 + mid * 8}, ${12 + mid * 14}, ${28 + bass * 18})`);
-  g.addColorStop(0.75, `rgb(${18 + mid * 12}, ${14 + bass * 8}, ${26 + mid * 10})`);
-  g.addColorStop(1, "#0c1520");
+  g.addColorStop(0, "#04070f");
+  g.addColorStop(0.55, `rgb(${10 + bass * 20}, ${12 + mid * 16}, ${32 + bass * 28})`);
+  g.addColorStop(1, "#0a1524");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, groundY + 2);
 
