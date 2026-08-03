@@ -4777,22 +4777,49 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   }
   ctx.restore();
 
-  // Kick / peak shock rings
-  if (bass > 0.28 || peak > 0.22 || snare > 0.35) {
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    const rings = 2 + (peak > 0.4 ? 1 : 0);
-    for (let i = 0; i < rings; i++) {
-      const phase = (now * 0.003 + i * 0.45) % 1;
-      const rr = sunR * (1.15 + phase * (2.8 + bass * 1.5));
-      const ra = (1 - phase) * (0.18 + bass * 0.22 + snare * 0.12);
-      ctx.strokeStyle = i % 2 ? `rgba(255, 110, 168, ${ra})` : `rgba(255, 160, 90, ${ra})`;
-      ctx.lineWidth = 1.5 + (1 - phase) * 2.5;
+  // Soft geometric wedges — Skyline's sun petals (same language as Night Drive)
+  if (fxOn("sunPetals")) {
+    const energy = Math.max(0, solo * 0.9 + mid * 0.28 - 0.1);
+    if (energy >= 0.05) {
+      const rInner = sunR * (0.95 + energy * 0.08);
+      const rOuter = sunR * (1.55 + energy * 1.35);
+      const petals = 8;
+      const open = 0.32 + energy * 0.48;
+      const rot = now * 0.00012 * (0.35 + energy) + solo * 0.55;
+      const alpha = Math.min(0.55, 0.1 + energy * 0.45);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.translate(sunX, sunY);
+      ctx.rotate(rot);
+      for (let i = 0; i < petals; i++) {
+        const slot = (Math.PI * 2) / petals;
+        const a0 = i * slot + slot * (1 - open) * 0.5;
+        const a1 = a0 + slot * open;
+        const hueT = i / petals + solo * 0.08 + now * 0.00002;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a0) * rInner, Math.sin(a0) * rInner);
+        ctx.arc(0, 0, rOuter, a0, a1, false);
+        ctx.lineTo(Math.cos(a1) * rInner, Math.sin(a1) * rInner);
+        ctx.arc(0, 0, rInner, a1, a0, true);
+        ctx.closePath();
+        const grad = ctx.createRadialGradient(0, 0, rInner * 0.4, 0, 0, rOuter);
+        grad.addColorStop(0, synthRainbow(hueT, alpha * 0.35));
+        grad.addColorStop(0.45, synthRainbow(hueT + 0.12, alpha * 0.7));
+        grad.addColorStop(0.82, synthRainbow(hueT + 0.22, alpha * 0.35));
+        grad.addColorStop(1, synthRainbow(hueT + 0.3, 0));
+        ctx.fillStyle = grad;
+        ctx.fill();
+        ctx.strokeStyle = synthRainbow(hueT + 0.18, alpha * 0.45);
+        ctx.lineWidth = 1 + energy * 1.2;
+        ctx.stroke();
+      }
       ctx.beginPath();
-      ctx.arc(sunX, sunY, rr, 0, Math.PI * 2);
+      ctx.arc(0, 0, rInner * (0.92 + energy * 0.08), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255, 220, 180, ${0.08 + energy * 0.2})`;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   // Anamorphic flare streak on hits
@@ -4823,18 +4850,13 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   ctx.arc(sunX, sunY, glowR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Inner halo ring
+  // Soft gold halo — quiet breath, not pulsing shock rings
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = `rgba(255, 140, 100, ${0.12 + heat * 0.2 + breath * 0.06})`;
-  ctx.lineWidth = 2 + bass * 3;
+  ctx.strokeStyle = `rgba(255, 140, 100, ${0.1 + heat * 0.14 + breath * 0.05})`;
+  ctx.lineWidth = 1.5 + bass * 1.5;
   ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * (1.25 + bass * 0.15), 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.strokeStyle = `rgba(255, 80, 130, ${0.08 + snare * 0.15})`;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(sunX, sunY, sunR * (1.55 + peak * 0.2), 0, Math.PI * 2);
+  ctx.arc(sunX, sunY, sunR * (1.2 + bass * 0.08), 0, Math.PI * 2);
   ctx.stroke();
   ctx.restore();
 
