@@ -8,6 +8,7 @@ Restored 2026-07-28 after the in-chat plan card was deleted. Updated 2026-08-02.
 - **What it is not:** Another MilkDrop preset browser, ad-supported equalizer, or paywalled core experience.
 - **Web stays free:** `projects/sunwake` on Pages keeps working as today (local file + system-audio capture). Mobile is the Capacitor sibling.
 - **Brand:** default eyebrow is **NIGHT DRIVE**. After Spotify App Remote connects, it becomes **NIGHT DRIVE · FOR SPOTIFY**. Capture already hears any playing app; Spotify is optional chrome, not the beat.
+- **Web scenes (2026-08-02):** Night Drive + **Skyline** (side-view highway/skyline strip). Skyline is **web-first** — bake into mobile only after it feels ready on Pages.
 
 ## Monetization (locked)
 
@@ -140,6 +141,7 @@ Proven on emulator (`Medium_Phone_API_36.1`):
 - When to start iOS relative to Android store comfort (after complete Android Play ship).
 - Hero CTA wording vs NIGHT DRIVE brand (eyebrow already night-drive-first).
 - MediaSession multi-app chrome timing.
+- When to port **Skyline** from web into `sunwake-mobile` (after web polish).
 
 ## Decisions locked
 

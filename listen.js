@@ -17,6 +17,26 @@ const airDot = document.getElementById("air-dot");
 const chromePresets = document.getElementById("chrome-presets");
 const hideUiBtn = document.getElementById("hide-ui");
 const uiPeek = document.getElementById("ui-peek");
+const brandEyebrow = document.getElementById("brand-eyebrow");
+const vizSwitchBtn = document.getElementById("viz-switch");
+
+const VIZ_MODE_KEY = "sunwake.vizMode";
+/** @type {"nightDrive" | "skyline"} */
+let vizMode = "nightDrive";
+try {
+  const stored = localStorage.getItem(VIZ_MODE_KEY);
+  if (stored === "skyline" || stored === "nightDrive") vizMode = stored;
+} catch {
+  /* ignore */
+}
+
+/** Side-scroll city for Skyline mode — regenerated on resize. */
+const skylineFar = [];
+const skylineMid = [];
+const skylineNear = [];
+let skylineKickBob = 0;
+/** Continuous side-scroll pixels for Skyline (driven by levels + gridDrive). */
+let skylineScrollPx = 0;
 
 let W = 0;
 let H = 0;
@@ -926,8 +946,10 @@ function showFileChrome() {
   pickBtn.hidden = false;
   if (chromePresets) chromePresets.hidden = true;
   systemChromeBtn.hidden = false;
+  if (vizSwitchBtn) vizSwitchBtn.hidden = false;
   toggleBtn.textContent = "Pause";
   setUsMode(false);
+  syncVizModeUi();
 }
 
 function showSystemChrome() {
@@ -937,8 +959,10 @@ function showSystemChrome() {
   pickBtn.hidden = false;
   if (chromePresets) chromePresets.hidden = true;
   systemChromeBtn.hidden = true;
+  if (vizSwitchBtn) vizSwitchBtn.hidden = false;
   toggleBtn.textContent = "Stop share";
   setUsMode(true);
+  syncVizModeUi();
 }
 
 function wireAudioElement(url) {
@@ -1150,6 +1174,7 @@ function resize() {
   canvas.style.width = `${W}px`;
   canvas.style.height = `${H}px`;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  seedSkylineCity();
 }
 
 function bandEnergy(data, from, to) {
@@ -3893,6 +3918,286 @@ function updateMeters(bass, mid, air) {
   }
 }
 
+function syncVizModeUi() {
+  const sky = vizMode === "skyline";
+  for (const btn of document.querySelectorAll("[data-viz]")) {
+    const on = btn.getAttribute("data-viz") === vizMode;
+    btn.classList.toggle("is-active", on);
+    btn.setAttribute("aria-pressed", on ? "true" : "false");
+  }
+  if (brandEyebrow) brandEyebrow.textContent = sky ? "skyline" : "night drive";
+  if (vizSwitchBtn) {
+    vizSwitchBtn.textContent = sky ? "Night Drive" : "Skyline";
+    vizSwitchBtn.title = sky ? "Switch to Night Drive" : "Switch to Skyline";
+  }
+  // Effects panel is Night Drive–oriented; tuck it away in Skyline
+  if (sky) {
+    setFxPanelHidden(true);
+    const peek = document.getElementById("fx-peek");
+    if (peek && (started || gate?.classList.contains("gone"))) peek.hidden = true;
+  } else if (started || gate?.classList.contains("gone")) {
+    const peek = document.getElementById("fx-peek");
+    if (peek && !stage.classList.contains("ui-hidden")) {
+      const panel = document.getElementById("fx-panel");
+      peek.hidden = !panel?.classList.contains("fx-panel-hidden");
+    }
+  }
+}
+
+function setVizMode(mode) {
+  if (mode !== "skyline" && mode !== "nightDrive") return;
+  if (mode === vizMode) {
+    syncVizModeUi();
+    return;
+  }
+  vizMode = mode;
+  try {
+    localStorage.setItem(VIZ_MODE_KEY, vizMode);
+  } catch {
+    /* ignore */
+  }
+  syncVizModeUi();
+  if (statusEl && (started || playing)) {
+    statusEl.textContent = vizMode === "skyline" ? "skyline" : "night drive";
+  }
+}
+
+function seedSkylineCity() {
+  if (!W || !H) return;
+  const fill = (arr, count, minH, maxH, minW, maxW) => {
+    arr.length = 0;
+    let x = 0;
+    const span = W * 2.4;
+    while (x < span && arr.length < count) {
+      const w = minW + Math.random() * (maxW - minW);
+      const h = minH + Math.random() * (maxH - minH);
+      const windows = [];
+      const cols = Math.max(2, Math.floor(w / 10));
+      const rows = Math.max(2, Math.floor(h / 12));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (Math.random() > 0.55) {
+            windows.push({
+              u: (c + 0.35) / cols,
+              v: (r + 0.35) / rows,
+              phase: Math.random() * Math.PI * 2,
+            });
+          }
+        }
+      }
+      arr.push({ x, w, h, windows, hue: Math.random() });
+      x += w + 4 + Math.random() * 18;
+    }
+  };
+  fill(skylineFar, 48, H * 0.08, H * 0.22, 28, 70);
+  fill(skylineMid, 40, H * 0.14, H * 0.34, 36, 90);
+  fill(skylineNear, 32, H * 0.2, H * 0.42, 44, 110);
+}
+
+function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, mid, air, now) {
+  if (!buildings.length) return;
+  const span = buildings.reduce((s, b) => Math.max(s, b.x + b.w), W) + 40;
+  const off = ((scroll % span) + span) % span;
+  ctx.save();
+  for (const b of buildings) {
+    let x = b.x - off;
+    if (x + b.w < -20) x += span;
+    if (x > W + 20) continue;
+    const top = groundY - b.h - bob * (0.35 + b.hue * 0.4);
+    ctx.fillStyle = `rgba(${12 + b.hue * 18}, ${8 + b.hue * 10}, ${28 + b.hue * 40}, ${alpha})`;
+    ctx.fillRect(x, top, b.w, b.h + bob * 0.2);
+    // Roof lip
+    ctx.fillStyle = `rgba(255, 110, 168, ${0.08 + air * 0.12})`;
+    ctx.fillRect(x, top, b.w, 2);
+    if (drawWindows && b.windows) {
+      ctx.globalCompositeOperation = "lighter";
+      for (const win of b.windows) {
+        const tw =
+          0.35 +
+          0.65 * (0.5 + 0.5 * Math.sin(now * 0.002 + win.phase + mid * 3));
+        const a = (0.15 + air * 0.55 + mid * 0.25) * tw;
+        if (a < 0.08) continue;
+        const wx = x + win.u * b.w;
+        const wy = top + win.v * b.h;
+        ctx.fillStyle = `rgba(255, 210, 140, ${a})`;
+        ctx.fillRect(wx, wy, Math.max(2, b.w * 0.08), Math.max(2, b.h * 0.06));
+      }
+      ctx.globalCompositeOperation = "source-over";
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Classic side-view highway + skyline strip — flat parallax, no vanish grid.
+ */
+function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
+  const roadTop = H * 0.62;
+  const horizonY = roadTop - H * 0.02;
+  skylineKickBob = smooth(skylineKickBob, bass * 10 + snare * 4, 0.28);
+  const bob = skylineKickBob;
+  const drive = 0.55 + FX.gridDrive * 2.8 + bass * 1.4 + mid * 0.6;
+  const dt = Math.min(40, PERF.emaDt || 16.7);
+  skylineScrollPx += drive * (dt / 16.7) * 2.4;
+  const scroll = skylineScrollPx + FX.gridScroll * W * 0.35;
+
+  // Sky
+  const g = ctx.createLinearGradient(0, 0, 0, horizonY);
+  g.addColorStop(0, "#04070f");
+  g.addColorStop(0.55, `rgb(${10 + bass * 20}, ${12 + mid * 16}, ${32 + bass * 28})`);
+  g.addColorStop(1, "#0a1524");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, horizonY + 2);
+
+  // Sparse stars
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const nStars = 48;
+  for (let i = 0; i < nStars; i++) {
+    const sx = ((i * 97 + scroll * 0.05) % W + W) % W;
+    const sy = ((i * 53) % Math.max(1, horizonY * 0.72));
+    const a = 0.15 + air * 0.45 * (0.5 + 0.5 * Math.sin(now * 0.0015 + i));
+    ctx.fillStyle = `rgba(200, 230, 255, ${a})`;
+    ctx.fillRect(sx, sy, 1.5, 1.5);
+  }
+  ctx.restore();
+
+  // Sun — left-back on the horizon
+  const sunX = W * 0.22;
+  const sunY = horizonY - H * 0.02;
+  const sunR = Math.min(W, H) * (0.1 + (fxOn("sunPulse") ? bass * 0.05 : 0)) * SUN_SCALE * 0.85;
+  const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR * 3.2);
+  sunGlow.addColorStop(0, `rgba(255, 200, 120, ${0.35 + bass * 0.25})`);
+  sunGlow.addColorStop(0.35, `rgba(255, 110, 168, ${0.18 + mid * 0.15})`);
+  sunGlow.addColorStop(1, "rgba(69, 224, 255, 0)");
+  ctx.fillStyle = sunGlow;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR * 3.2, 0, Math.PI * 2);
+  ctx.fill();
+  const sunDisk = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR);
+  sunDisk.addColorStop(0, "#fff6d8");
+  sunDisk.addColorStop(0.45, "#ffb070");
+  sunDisk.addColorStop(1, "#ff6ea8");
+  ctx.fillStyle = sunDisk;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, sunR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Horizon haze line
+  const haze = ctx.createLinearGradient(0, horizonY - 18, 0, horizonY + 8);
+  haze.addColorStop(0, "rgba(69, 224, 255, 0)");
+  haze.addColorStop(0.6, `rgba(255, 110, 168, ${0.15 + solo * 0.2})`);
+  haze.addColorStop(1, "rgba(69, 224, 255, 0)");
+  ctx.fillStyle = haze;
+  ctx.fillRect(0, horizonY - 18, W, 28);
+
+  drawSkylineLayer(skylineFar, scroll * 0.25, horizonY, bob * 0.25, 0.55, false, mid, air, now);
+  drawSkylineLayer(skylineMid, scroll * 0.55, horizonY, bob * 0.45, 0.72, true, mid, air, now);
+  drawSkylineLayer(skylineNear, scroll * 0.95, horizonY, bob * 0.7, 0.92, true, mid, air, now);
+
+  // Highway band
+  const roadH = H - roadTop;
+  const roadGrad = ctx.createLinearGradient(0, roadTop, 0, H);
+  roadGrad.addColorStop(0, "#0a1220");
+  roadGrad.addColorStop(0.2, "#121a2c");
+  roadGrad.addColorStop(1, "#050814");
+  ctx.fillStyle = roadGrad;
+  ctx.fillRect(0, roadTop, W, roadH);
+
+  // Shoulder glow
+  ctx.fillStyle = `rgba(69, 224, 255, ${0.06 + bass * 0.08})`;
+  ctx.fillRect(0, roadTop, W, 3);
+  ctx.fillStyle = `rgba(255, 110, 168, ${0.05 + mid * 0.07})`;
+  ctx.fillRect(0, roadTop + 3, W, 2);
+
+  // Lane dashes
+  const laneY = roadTop + roadH * 0.42;
+  const dashW = 36;
+  const gap = 28;
+  const dashOff = (scroll * drive * 1.15) % (dashW + gap);
+  ctx.strokeStyle = `rgba(240, 197, 106, ${0.45 + peak * 0.35})`;
+  ctx.lineWidth = 3;
+  ctx.setLineDash([dashW, gap]);
+  ctx.lineDashOffset = -dashOff;
+  ctx.beginPath();
+  ctx.moveTo(0, laneY + bob * 0.15);
+  ctx.lineTo(W, laneY + bob * 0.15);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Edge lines
+  ctx.strokeStyle = `rgba(159, 217, 255, ${0.25 + hat * 0.3})`;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(0, roadTop + roadH * 0.12);
+  ctx.lineTo(W, roadTop + roadH * 0.12);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, roadTop + roadH * 0.78);
+  ctx.lineTo(W, roadTop + roadH * 0.78);
+  ctx.stroke();
+
+  // Kick flash on asphalt
+  if (bass > 0.35 || snare > 0.4) {
+    ctx.fillStyle = `rgba(255, 110, 168, ${(bass * 0.08 + snare * 0.06) * peak})`;
+    ctx.fillRect(0, roadTop, W, roadH * 0.5);
+  }
+
+  // Speed streaks on peak
+  if (peak > 0.2 || FX.gridDrive > 0.4) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const streaksN = 6 + Math.floor(peak * 10);
+    for (let i = 0; i < streaksN; i++) {
+      const y = roadTop + 8 + ((i * 37 + now * 0.02) % (roadH * 0.7));
+      const len = 40 + peak * 80 + mid * 40;
+      const x = ((i * 113 - scroll * 2.2) % (W + len) + W + len) % (W + len) - len;
+      ctx.strokeStyle = `rgba(69, 224, 255, ${0.08 + peak * 0.2})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + len, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+function drawNightDrive(now, bass, mid, air, peak, snare, hat, solo) {
+  updateCamera(now, bass, mid, air, peak, snare);
+  applyWorldTransform();
+
+  drawSky(now, bass, mid);
+  drawStars(now, air, mid, solo, bass);
+  if (fxOn("harmonyConstellation")) drawHarmonyConstellation(bass, solo);
+  if (fxOn("shootingStars")) drawShootingStars(bass, solo);
+  if (fxOn("soloAurora")) drawSoloAurora(solo, air);
+  if (fxOn("cloudDeck")) drawCloudDeck(now);
+  if (fxOn("melodyThread")) drawMelodyThread();
+  if (fxOn("sunPetals")) drawSunPetals(now, mid, solo);
+  drawSoftSun(bass, mid, solo);
+  drawHeartbeatRing(bass, mid);
+  drawUsPresence(bass, mid, air);
+  if (fxOn("chordHalos")) drawChordHalos();
+  if (fxOn("hammerRipples")) drawHammerRipples();
+  if (fxOn("shockRings")) drawShocks();
+  if (fxOn("horizonRibbons")) drawHorizonRibbons(now, bass, mid, solo);
+  drawHorizon(bass);
+  if (fxOn("bassMountain")) drawBassMountain(bass);
+  if (fxOn("mirrorSea")) drawMirrorSea();
+  drawSea(now, bass, mid, air);
+  if (fxOn("quasarJets")) drawQuasarJets(now, bass, mid, solo);
+  if (fxOn("sunFlares")) drawSunFlares(now, peak, solo, bass);
+  if (fxOn("mistSheets")) drawMistSheets(now, mid);
+  if (fxOn("rain")) drawRain(mid);
+  if (fxOn("fog")) drawFog(now, bass);
+  if (fxOn("dew")) drawDew(now, air, mid);
+  if (fxOn("sparks")) drawSparks(bass, solo);
+  if (fxOn("streaks")) drawStreaks();
+
+  resetScreenTransform();
+}
+
 function frame(now) {
   raf = requestAnimationFrame(frame);
   updatePerf(now);
@@ -3940,39 +4245,13 @@ function frame(now) {
   updateFx(bass, mid, air, now, peak, snare, hat, leadPitch);
   const solo = FX.solo;
 
-  updateCamera(now, bass, mid, air, peak, snare);
-  applyWorldTransform();
+  if (vizMode === "skyline") {
+    resetScreenTransform();
+    drawSkyline(now, bass, mid, air, peak, snare, hat, solo);
+  } else {
+    drawNightDrive(now, bass, mid, air, peak, snare, hat, solo);
+  }
 
-  drawSky(now, bass, mid);
-  drawStars(now, air, mid, solo, bass);
-  if (fxOn("harmonyConstellation")) drawHarmonyConstellation(bass, solo);
-  if (fxOn("shootingStars")) drawShootingStars(bass, solo);
-  if (fxOn("soloAurora")) drawSoloAurora(solo, air);
-  if (fxOn("cloudDeck")) drawCloudDeck(now);
-  if (fxOn("melodyThread")) drawMelodyThread();
-  if (fxOn("sunPetals")) drawSunPetals(now, mid, solo);
-  drawSoftSun(bass, mid, solo);
-  drawHeartbeatRing(bass, mid);
-  drawUsPresence(bass, mid, air);
-  if (fxOn("chordHalos")) drawChordHalos();
-  if (fxOn("hammerRipples")) drawHammerRipples();
-  if (fxOn("shockRings")) drawShocks();
-  if (fxOn("horizonRibbons")) drawHorizonRibbons(now, bass, mid, solo);
-  drawHorizon(bass);
-  if (fxOn("bassMountain")) drawBassMountain(bass);
-  if (fxOn("mirrorSea")) drawMirrorSea();
-  drawSea(now, bass, mid, air);
-  // Jets + flares after sea so the horizon ellipse doesn't bury them
-  if (fxOn("quasarJets")) drawQuasarJets(now, bass, mid, solo);
-  if (fxOn("sunFlares")) drawSunFlares(now, peak, solo, bass);
-  if (fxOn("mistSheets")) drawMistSheets(now, mid);
-  if (fxOn("rain")) drawRain(mid);
-  if (fxOn("fog")) drawFog(now, bass);
-  if (fxOn("dew")) drawDew(now, air, mid);
-  if (fxOn("sparks")) drawSparks(bass, solo);
-  if (fxOn("streaks")) drawStreaks();
-
-  resetScreenTransform();
   drawVignette();
   updateMeters(bass, mid, air);
 }
@@ -4171,6 +4450,18 @@ filePick.addEventListener("change", () => {
   filePick.value = "";
 });
 filePick.addEventListener("click", (e) => e.stopPropagation());
+
+document.querySelectorAll("[data-viz]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const mode = btn.getAttribute("data-viz");
+    if (mode === "skyline" || mode === "nightDrive") setVizMode(mode);
+  });
+});
+vizSwitchBtn?.addEventListener("click", () => {
+  setVizMode(vizMode === "skyline" ? "nightDrive" : "skyline");
+});
+syncVizModeUi();
+
 window.addEventListener("keydown", onKey);
 window.addEventListener("dragover", onDragOver);
 window.addEventListener("dragleave", onDragLeave);

@@ -17,13 +17,22 @@
       <canvas id="viz" aria-hidden="true"></canvas>
 
       <header class="brand">
-        <p class="eyebrow">audio visualizer</p>
+        <p class="eyebrow" id="brand-eyebrow">night drive</p>
         <h1>SUNWAKE</h1>
         <p id="track-title" class="subtitle" hidden></p>
       </header>
 
       <div id="gate" class="gate">
         <div class="gate-card">
+          <p class="gate-kicker">choose a night</p>
+          <div class="viz-mode-picker" role="group" aria-label="Visualizer mode">
+            <button type="button" class="viz-mode-btn is-active" data-viz="nightDrive" aria-pressed="true">
+              Night Drive
+            </button>
+            <button type="button" class="viz-mode-btn" data-viz="skyline" aria-pressed="false">
+              Skyline
+            </button>
+          </div>
           <button id="play" type="button" class="play-btn">Open A Song</button>
           <button id="system-play" type="button" class="play-btn system-btn">Listen To System Audio</button>
           <p class="system-hint">Chrome/Edge · Entire screen · Share system audio</p>
@@ -39,6 +48,9 @@
         </div>
         <p id="status" class="status">waiting…</p>
         <div class="presets chrome-presets" id="chrome-presets" hidden></div>
+        <button id="viz-switch" type="button" class="toggle viz-switch-btn" hidden title="Switch visualizer">
+          Skyline
+        </button>
         <button id="toggle" type="button" class="toggle" hidden>Pause</button>
         <button id="restart" type="button" class="toggle" hidden>Restart</button>
         <button id="system-chrome" type="button" class="toggle" hidden>System audio</button>

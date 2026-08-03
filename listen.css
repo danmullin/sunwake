@@ -139,8 +139,51 @@ body {
   padding: 1.5rem;
 }
 
+.viz-mode-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+}
+
+.viz-mode-btn {
+  appearance: none;
+  min-height: 2.4rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  border: 1px solid rgba(159, 217, 255, 0.28);
+  background: rgba(8, 12, 28, 0.72);
+  color: rgba(200, 220, 245, 0.78);
+  font-family: Orbitron, sans-serif;
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.viz-mode-btn:hover {
+  border-color: rgba(69, 224, 255, 0.45);
+  color: rgba(236, 246, 255, 0.95);
+}
+
+.viz-mode-btn.is-active {
+  border-color: transparent;
+  background: linear-gradient(135deg, #45e0ff, #8af0ff 45%, #ff6ea8);
+  color: #050814;
+  box-shadow: 0 0 14px rgba(69, 224, 255, 0.22);
+}
+
+.viz-switch-btn {
+  min-width: 6.5rem;
+}
+
 .gate-kicker {
-  margin: 0;
+  margin: 0 0 0.65rem;
   font-family: Orbitron, sans-serif;
   font-size: 0.65rem;
   letter-spacing: 0.38em;

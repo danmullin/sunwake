@@ -1,8 +1,17 @@
 # Sunwake
 
-Synthwave audio visualizer — a night-drive sea of light that reacts to your music.
+Synthwave audio visualizer — a night-drive sea of light that reacts to your music, plus a classic side-view **Skyline** highway strip.
 
 **Live:** https://danmullin.github.io/sunwake/
+
+## Scenes (web)
+
+| Mode | Feel |
+|------|------|
+| **Night Drive** (default) | Perspective grid sea, camera sway, full Effects panel |
+| **Skyline** | Flat side-view skyline + highway strip (parallax buildings, lane dashes) |
+
+Pick on the gate before you listen, or switch from the chrome button while playing. Preference is saved in the browser. Skyline is web-first; mobile bake comes later when it feels ready.
 
 ## Run
 
@@ -17,16 +26,17 @@ Or open `index.html` via any static file server (modules need HTTP, not `file://
 
 ## Listen
 
-1. **Open a song** — pick a local audio file, or drag one onto the page
-2. **Listen to system audio** — Chrome or Edge → Entire screen → check **Share system audio** (Spotify, YouTube, etc.)
-3. **Hide UI** (`H`) for a clean full-screen view
-4. **Effects** panel (`F`) — toggle visuals; drag the title bar to move it
+1. Choose **Night Drive** or **Skyline**
+2. **Open a song** — pick a local audio file, or drag one onto the page
+3. **Listen to system audio** — Chrome or Edge → Entire screen → check **Share system audio** (Spotify, YouTube, etc.)
+4. **Hide UI** (`H`) for a clean full-screen view
+5. **Effects** panel (`F`) — Night Drive toggles; drag the title bar to move it (hidden in Skyline)
 
 ## Tips
 
 - Chrome or Edge works best for system audio capture
 - No songs are bundled — bring your own
-- **B-sides** in the Effects panel are experimental FX (off by default)
+- **B-sides** in the Effects panel are experimental FX (off by default; Night Drive)
 
 ```powershell
 node _check-public.js
