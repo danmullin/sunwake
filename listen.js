@@ -37,6 +37,8 @@ const skylineNear = [];
 let skylineKickBob = 0;
 /** Continuous side-scroll pixels for Skyline (driven by levels + gridDrive). */
 let skylineScrollPx = 0;
+/** Smoothed scroll rate — avoids bass spikes hitching the strip. */
+let skylineDriveSmooth = 0.8;
 
 let W = 0;
 let H = 0;
@@ -3964,13 +3966,15 @@ function setVizMode(mode) {
 
 function seedSkylineCity() {
   if (!W || !H) return;
-  const fill = (arr, count, minH, maxH, minW, maxW) => {
+  // Long seamless strip (~4.5 viewports) so the city rides across before looping.
+  const fill = (arr, minH, maxH, minW, maxW) => {
     arr.length = 0;
     let x = 0;
-    const span = W * 2.4;
-    while (x < span && arr.length < count) {
+    const target = Math.max(W * 4.5, 3200);
+    while (x < target) {
       const w = minW + Math.random() * (maxW - minW);
       const h = minH + Math.random() * (maxH - minH);
+      const gap = 3 + Math.random() * 14;
       const windows = [];
       const cols = Math.max(2, Math.floor(w / 10));
       const rows = Math.max(2, Math.floor(h / 12));
@@ -3986,43 +3990,46 @@ function seedSkylineCity() {
         }
       }
       arr.push({ x, w, h, windows, hue: Math.random() });
-      x += w + 4 + Math.random() * 18;
+      x += w + gap;
     }
+    // Exact loop period = end of last building (no extra pad — pad caused a dead gap hitch)
+    arr.loopW = Math.max(x, W + 1);
   };
-  fill(skylineFar, 48, H * 0.08, H * 0.22, 28, 70);
-  fill(skylineMid, 40, H * 0.14, H * 0.34, 36, 90);
-  fill(skylineNear, 32, H * 0.2, H * 0.42, 44, 110);
+  fill(skylineFar, H * 0.08, H * 0.22, 28, 70);
+  fill(skylineMid, H * 0.14, H * 0.34, 36, 90);
+  fill(skylineNear, H * 0.2, H * 0.42, 44, 110);
 }
 
 function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, mid, air, now) {
   if (!buildings.length) return;
-  const span = buildings.reduce((s, b) => Math.max(s, b.x + b.w), W) + 40;
-  const off = ((scroll % span) + span) % span;
+  const loopW = buildings.loopW || W * 4;
+  const off = ((scroll % loopW) + loopW) % loopW;
   ctx.save();
   for (const b of buildings) {
-    let x = b.x - off;
-    if (x + b.w < -20) x += span;
-    if (x > W + 20) continue;
-    const top = groundY - b.h - bob * (0.35 + b.hue * 0.4);
-    ctx.fillStyle = `rgba(${12 + b.hue * 18}, ${8 + b.hue * 10}, ${28 + b.hue * 40}, ${alpha})`;
-    ctx.fillRect(x, top, b.w, b.h + bob * 0.2);
-    // Roof lip
-    ctx.fillStyle = `rgba(255, 110, 168, ${0.08 + air * 0.12})`;
-    ctx.fillRect(x, top, b.w, 2);
-    if (drawWindows && b.windows) {
-      ctx.globalCompositeOperation = "lighter";
-      for (const win of b.windows) {
-        const tw =
-          0.35 +
-          0.65 * (0.5 + 0.5 * Math.sin(now * 0.002 + win.phase + mid * 3));
-        const a = (0.15 + air * 0.55 + mid * 0.25) * tw;
-        if (a < 0.08) continue;
-        const wx = x + win.u * b.w;
-        const wy = top + win.v * b.h;
-        ctx.fillStyle = `rgba(255, 210, 140, ${a})`;
-        ctx.fillRect(wx, wy, Math.max(2, b.w * 0.08), Math.max(2, b.h * 0.06));
-      }
+    // Tile ±1 period so buildings straddling the wrap stay continuous
+    for (let k = -1; k <= 1; k++) {
+      const x = b.x - off + k * loopW;
+      if (x + b.w < -4 || x > W + 4) continue;
+      const top = groundY - b.h - bob * (0.35 + b.hue * 0.4);
       ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = `rgba(${12 + b.hue * 18}, ${8 + b.hue * 10}, ${28 + b.hue * 40}, ${alpha})`;
+      ctx.fillRect(x, top, b.w, b.h + bob * 0.2);
+      ctx.fillStyle = `rgba(255, 110, 168, ${0.08 + air * 0.12})`;
+      ctx.fillRect(x, top, b.w, 2);
+      if (drawWindows && b.windows) {
+        ctx.globalCompositeOperation = "lighter";
+        for (const win of b.windows) {
+          const tw =
+            0.35 +
+            0.65 * (0.5 + 0.5 * Math.sin(now * 0.002 + win.phase + mid * 3));
+          const a = (0.15 + air * 0.55 + mid * 0.25) * tw;
+          if (a < 0.08) continue;
+          const wx = x + win.u * b.w;
+          const wy = top + win.v * b.h;
+          ctx.fillStyle = `rgba(255, 210, 140, ${a})`;
+          ctx.fillRect(wx, wy, Math.max(2, b.w * 0.08), Math.max(2, b.h * 0.06));
+        }
+      }
     }
   }
   ctx.restore();
@@ -4034,12 +4041,15 @@ function drawSkylineLayer(buildings, scroll, groundY, bob, alpha, drawWindows, m
 function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   const roadTop = H * 0.62;
   const horizonY = roadTop - H * 0.02;
-  skylineKickBob = smooth(skylineKickBob, bass * 10 + snare * 4, 0.28);
+  skylineKickBob = smooth(skylineKickBob, bass * 10 + snare * 4, 0.22);
   const bob = skylineKickBob;
-  const drive = 0.55 + FX.gridDrive * 2.8 + bass * 1.4 + mid * 0.6;
-  const dt = Math.min(40, PERF.emaDt || 16.7);
-  skylineScrollPx += drive * (dt / 16.7) * 2.4;
-  const scroll = skylineScrollPx + FX.gridScroll * W * 0.35;
+  // Smooth drive — raw bass was hitching scroll every kick
+  const driveTarget = 0.7 + FX.gridDrive * 1.6 + bass * 0.9 + mid * 0.45;
+  skylineDriveSmooth = smooth(skylineDriveSmooth, driveTarget, 0.1);
+  const dt = Math.min(33, PERF.emaDt || 16.7);
+  // Continuous px scroll only — do NOT add FX.gridScroll (it wraps 0→1 and jumps)
+  skylineScrollPx += skylineDriveSmooth * (dt / 16.7) * 2.8;
+  const scroll = skylineScrollPx;
 
   // Sky
   const g = ctx.createLinearGradient(0, 0, 0, horizonY);
@@ -4049,12 +4059,12 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, horizonY + 2);
 
-  // Sparse stars
+  // Sparse stars (slow drift, seamless across W)
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const nStars = 48;
   for (let i = 0; i < nStars; i++) {
-    const sx = ((i * 97 + scroll * 0.05) % W + W) % W;
+    const sx = ((i * 97 + scroll * 0.04) % W + W) % W;
     const sy = ((i * 53) % Math.max(1, horizonY * 0.72));
     const a = 0.15 + air * 0.45 * (0.5 + 0.5 * Math.sin(now * 0.0015 + i));
     ctx.fillStyle = `rgba(200, 230, 255, ${a})`;
@@ -4091,9 +4101,9 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = haze;
   ctx.fillRect(0, horizonY - 18, W, 28);
 
-  drawSkylineLayer(skylineFar, scroll * 0.25, horizonY, bob * 0.25, 0.55, false, mid, air, now);
-  drawSkylineLayer(skylineMid, scroll * 0.55, horizonY, bob * 0.45, 0.72, true, mid, air, now);
-  drawSkylineLayer(skylineNear, scroll * 0.95, horizonY, bob * 0.7, 0.92, true, mid, air, now);
+  drawSkylineLayer(skylineFar, scroll * 0.22, horizonY, bob * 0.25, 0.55, false, mid, air, now);
+  drawSkylineLayer(skylineMid, scroll * 0.5, horizonY, bob * 0.45, 0.72, true, mid, air, now);
+  drawSkylineLayer(skylineNear, scroll * 0.88, horizonY, bob * 0.7, 0.92, true, mid, air, now);
 
   // Highway band
   const roadH = H - roadTop;
@@ -4110,18 +4120,19 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.fillStyle = `rgba(255, 110, 168, ${0.05 + mid * 0.07})`;
   ctx.fillRect(0, roadTop + 3, W, 2);
 
-  // Lane dashes
+  // Lane dashes — period matches dash+gap so wrap is invisible
   const laneY = roadTop + roadH * 0.42;
   const dashW = 36;
   const gap = 28;
-  const dashOff = (scroll * drive * 1.15) % (dashW + gap);
+  const period = dashW + gap;
+  const dashOff = ((scroll * 1.15) % period + period) % period;
   ctx.strokeStyle = `rgba(240, 197, 106, ${0.45 + peak * 0.35})`;
   ctx.lineWidth = 3;
   ctx.setLineDash([dashW, gap]);
   ctx.lineDashOffset = -dashOff;
   ctx.beginPath();
-  ctx.moveTo(0, laneY + bob * 0.15);
-  ctx.lineTo(W, laneY + bob * 0.15);
+  ctx.moveTo(-period, laneY + bob * 0.15);
+  ctx.lineTo(W + period, laneY + bob * 0.15);
   ctx.stroke();
   ctx.setLineDash([]);
 
@@ -4151,7 +4162,9 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
     for (let i = 0; i < streaksN; i++) {
       const y = roadTop + 8 + ((i * 37 + now * 0.02) % (roadH * 0.7));
       const len = 40 + peak * 80 + mid * 40;
-      const x = ((i * 113 - scroll * 2.2) % (W + len) + W + len) % (W + len) - len;
+      const streakPeriod = W + len;
+      const x =
+        ((((i * 113 - scroll * 2.2) % streakPeriod) + streakPeriod) % streakPeriod) - len;
       ctx.strokeStyle = `rgba(69, 224, 255, ${0.08 + peak * 0.2})`;
       ctx.lineWidth = 1.5;
       ctx.beginPath();
