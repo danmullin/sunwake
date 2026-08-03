@@ -4720,38 +4720,37 @@ function drawSkylineSun(now, bass, mid, air, peak, snare, solo, tallRoofY) {
   ctx.fillRect(0, 0, W, tallRoofY + sunR * 4);
   ctx.restore();
 
-  // Cloud wake — streams off the LEFT so the sun feels like it's following us
+  // Slight cloud cover — soft bands drifting across / around the disk
   ctx.save();
-  for (let i = 0; i < 7; i++) {
-    const t = i / 6;
-    const drift = Math.sin(now * 0.00035 + i * 0.9) * sunR * 0.22;
-    const wx = sunX - sunR * (0.35 + t * 5.8);
-    const wy = sunY + drift + (i - 3) * sunR * 0.2;
-    const ww = sunR * (2.6 + t * 6 + heat * 0.8);
-    const wh = sunR * (0.5 + (1 - t) * 0.6);
-    const wake = ctx.createRadialGradient(wx, wy, 0, wx, wy, ww);
-    const a0 = (0.18 - t * 0.02) * (0.7 + mid * 0.3 + heat * 0.15);
-    wake.addColorStop(0, `rgba(28, 12, 36, ${a0})`);
-    wake.addColorStop(0.35, `rgba(70, 22, 48, ${a0 * 0.55})`);
-    wake.addColorStop(0.7, `rgba(40, 18, 55, ${a0 * 0.22})`);
-    wake.addColorStop(1, "rgba(10, 8, 20, 0)");
-    ctx.fillStyle = wake;
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    const drift = ((now * 0.008 + i * 47 + t * 40) % (sunR * 8)) - sunR * 2;
+    const cx = sunX - sunR * 1.2 + drift * 0.35 + (i - 2) * sunR * 0.55;
+    const cy = sunY + Math.sin(now * 0.0004 + i * 1.3) * sunR * 0.35 + (i % 2 ? 1 : -1) * sunR * 0.15;
+    const cw = sunR * (1.8 + t * 1.4 + Math.sin(now * 0.0006 + i) * 0.3);
+    const ch = sunR * (0.35 + (i % 3) * 0.12);
+    const cloud = ctx.createRadialGradient(cx, cy, 0, cx, cy, cw);
+    const a0 = (0.1 + t * 0.04) * (0.65 + mid * 0.25 + breath * 0.1);
+    cloud.addColorStop(0, `rgba(50, 28, 55, ${a0})`);
+    cloud.addColorStop(0.45, `rgba(35, 20, 48, ${a0 * 0.55})`);
+    cloud.addColorStop(1, "rgba(15, 10, 25, 0)");
+    ctx.fillStyle = cloud;
     ctx.beginPath();
-    ctx.ellipse(wx, wy, ww, wh, 0.06 - i * 0.015, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, cw, ch, -0.05 + i * 0.03, 0, Math.PI * 2);
     ctx.fill();
   }
+  // Thin lit undersides where the sun catches cloud edges
   ctx.globalCompositeOperation = "lighter";
   for (let i = 0; i < 3; i++) {
-    const t = i / 3;
-    const lx = sunX - sunR * (0.85 + t * 1.8);
-    const ly = sunY + Math.sin(now * 0.0005 + i) * sunR * 0.12;
-    const lip = ctx.createRadialGradient(lx, ly, 0, lx, ly, sunR * (1.2 + t));
-    lip.addColorStop(0, `rgba(255, 90, 110, ${(0.08 + heat * 0.06) - t * 0.02})`);
-    lip.addColorStop(0.5, `rgba(180, 60, 100, ${0.045 - t * 0.01})`);
-    lip.addColorStop(1, "rgba(80, 30, 60, 0)");
-    ctx.fillStyle = lip;
+    const cx = sunX + (i - 1) * sunR * 0.9 + Math.sin(now * 0.0005 + i) * sunR * 0.4;
+    const cy = sunY + sunR * (0.15 + i * 0.12);
+    const rim = ctx.createRadialGradient(cx, cy, 0, cx, cy, sunR * 1.4);
+    rim.addColorStop(0, `rgba(255, 120, 100, ${0.05 + heat * 0.04})`);
+    rim.addColorStop(0.5, `rgba(200, 70, 90, ${0.025})`);
+    rim.addColorStop(1, "rgba(80, 30, 50, 0)");
+    ctx.fillStyle = rim;
     ctx.beginPath();
-    ctx.ellipse(lx, ly, sunR * (1.4 + t * 1.2), sunR * 0.35, 0.1, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, sunR * (1.2 + i * 0.2), sunR * 0.28, 0.08, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
