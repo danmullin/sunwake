@@ -4135,7 +4135,8 @@ function drawSkyline(now, bass, mid, air, peak, snare, hat, solo) {
   ctx.strokeStyle = `rgba(240, 197, 106, ${0.45 + peak * 0.35})`;
   ctx.lineWidth = 3;
   ctx.setLineDash([dashW, gap]);
-  ctx.lineDashOffset = -dashOff;
+  // Positive offset = dashes travel left with the skyline (path is L→R)
+  ctx.lineDashOffset = dashOff;
   ctx.beginPath();
   ctx.moveTo(-period, laneY + bob * 0.15);
   ctx.lineTo(W + period, laneY + bob * 0.15);
